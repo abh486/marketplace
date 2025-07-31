@@ -5,7 +5,7 @@ import Swiper from 'react-native-swiper';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
-const Cards = ({ item, type, activeTab, onBuy, onFavorite, onPress }) => {
+const RealEstateCard = ({ item, type, activeTab, onBuy, onFavorite, onPress }) => {
   const [favorited, setFavorited] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -693,4 +693,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Cards;
+export default RealEstateCard;

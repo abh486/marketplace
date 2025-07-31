@@ -426,9 +426,8 @@ const MarketScreen = () => {
         >
           {/* Cards */}
           <Animated.View
+            className="px-4 pt-2"
             style={{
-              paddingHorizontal: 16,
-              paddingTop: 8,
               opacity: contentAnim,
               transform: [
                 {
