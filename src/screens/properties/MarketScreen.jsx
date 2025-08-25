@@ -1,484 +1,518 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  Image,
   SafeAreaView,
-  StatusBar,
-  ScrollView,
+  Dimensions,
   Animated,
+  Share,
+  TextInput,
+  ScrollView,
 } from 'react-native';
-import { useNavigation, useScrollToTop } from '@react-navigation/native';
-import Cards from './Cards';
-import Tabs from './Tabs';
-import BottomNav from './BottomNav';
-import Navbar from './Navbar';
+import Icon from 'react-native-vector-icons/Feather';
+import LinearGradient from 'react-native-linear-gradient';
+import FontAwesome from 'react-native-vector-icons/FontAwesome';
 
-const MarketScreen = () => {
-  const [activeTab, setActiveTab] = useState('All');
-  const navigation = useNavigation();
+import Navbar from "../properties/Navbar";
+import BottomNav from "../properties/BottomNav";
 
-  // Animation values
-  const headerAnim = useRef(new Animated.Value(0)).current;
-  const contentAnim = useRef(new Animated.Value(0)).current;
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
-  // ScrollView ref for scroll-to-top
-  const scrollRef = useRef(null);
-  useScrollToTop(scrollRef);
+const COLORS = {
+  backgroundGradient1: '#001A13',
+  backgroundGradient2: '#003B28',
+  backgroundGradient3: '#017148ff',
+  accentColor: '#fff',
+  cardBackground: '#07392dff',
+  starFilled: '#FFD700', // realistic gold star
+  starEmpty: '#048d51ff',
+  overlayIconBg: 'rgba(0,0,0,0.35)',
+  grey: '#aaa',
+};
+
+const categories = [
+  { label: 'All', icon: 'grid', key: 'All' },
+  { label: 'Credit', icon: 'credit-card', key: 'Credit' },
+  { label: 'Collectibles', icon: 'gift', key: 'Collectibles' },
+  { label: 'Stocks', icon: 'briefcase', key: 'Stocks' },
+  { label: 'Real Estate', icon: 'home', key: 'Real Estate' },
+  { label: 'Commodities', icon: 'box', key: 'Commodities' },
+  { label: 'Membership', icon: 'user-plus', key: 'Membership' },
+  { label: 'NFT', icon: 'image', key: 'NFT' },
+];
+
+const ASSETS = [
+  {
+    id: '1',
+    images: [
+      require('../../assets/image/build2.jpg'),
+      require('../../assets/image/build1.jpg'),
+    ],
+    name: "Luxury Apartments",
+    price: '$2,500 USDC',
+    category: 'Real Estate',
+    location: 'New York, USA',
+    roi: '+12% ROI',
+    rating: 5,
+    reviews: 130,
+  },
+  {
+    id: '2',
+    images: [
+      require('../../assets/image/apar.jpg'),
+      require('../../assets/image/villa1.jpg'),
+    ],
+    name: "Luxury Apartments",
+    price: '$2,500 USDC',
+    category: 'Real Estate',
+    location: 'Dubai, UAE',
+    roi: '+12% ROI',
+    rating: 4.5,
+    reviews: 108,
+  },
+  {
+    id: '3',
+    images: [
+      require('../../assets/image/watch.jpg'),
+      require('../../assets/image/collectible.jpg'),
+    ],
+    name: 'Vintage Watches',
+    price: '$5,200 USDC',
+    category: 'Collectibles',
+    location: 'Geneva, Switzerland',
+    roi: '+13% ROI',
+    rating: 4.7,
+    reviews: 200,
+  },
+  {
+    id: '4',
+    images: [
+      require('../../assets/image/gold1.jpg'),
+      require('../../assets/image/gold2.jpg'),
+    ],
+    name: 'Gold Bar',
+    price: '$2,100 USDC',
+    category: 'Commodities',
+    location: 'Global',
+    roi: '+4% YOY',
+    rating: 4,
+    reviews: 93,
+  },
+  {
+    id: '5',
+    images: [
+      require('../../assets/image/art.jpeg'),
+      require('../../assets/image/art1.jpg'),
+    ],
+    name: 'Contemporary Art',
+    price: '$11,000 USDC',
+    category: 'Collectibles',
+    location: 'Paris, France',
+    roi: '+9% ROI',
+    rating: 5,
+    reviews: 51,
+  },
+  {
+    id: '6',
+    images: [
+      require('../../assets/image/commodities.jpg'),
+      require('../../assets/image/copper.jpeg'),
+    ],
+    name: 'Copper',
+    price: '$3,450 USDC',
+    category: 'Commodities',
+    location: 'Middle East',
+    roi: '+7% ROI',
+    rating: 4.2,
+    reviews: 74,
+  },
+];
+
+function ReviewStars({ rating, reviews }) {
+  const stars = [];
+  for (let i = 1; i <= 5; i++) {
+    const color = rating >= i ? COLORS.starFilled : COLORS.grey;
+    stars.push(
+      <FontAwesome key={i} name="star" size={10} color={color} style={{ marginRight: 2 }} />
+    );
+  }
+  return (
+    <View style={styles.reviewContainer}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {stars}
+      </View>
+      <Text style={[styles.reviewText, { color: COLORS.accentColor }]}>{rating} ({reviews})</Text>
+    </View>
+  );
+}
+
+function ImageSlider({ images }) {
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const flatListRef = useRef(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
-    Animated.sequence([
-      Animated.timing(headerAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(contentAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [headerAnim, contentAnim]);
-
-  const tabData = [
-    { id: 'All', title: 'All', icon: 'apps', color: '#FFD600'},
-    { id: 'Upcoming', title: 'Upcoming', icon: 'event',  color: '#00C853' },
-    { id: 'Real Estate', title: 'Real Estate', icon: 'home', color: '#2979FF' },
-    { id: 'Gold', title: 'Gold', icon: 'star', color: '#FFD700' },
-    { id: 'Tokenization', title: 'Tokenization', icon: 'token', color: '#9C27B0' },
-    { id: 'Green', title: 'Green', icon: 'eco', color: '#4CAF50' },
-  ];
-
-  const realEstateData = [
-    {
-      id: 1,
-      title: 'Luxury Villa Paradise',
-      location: 'Miami, USA',
-      price: '$3.2M',
-      originalPrice: '$3.5M',
-      bedrooms: 4,
-      bathrooms: 3,
-      area: 3200,
-      trending: true,
-      featured: true,
-      rating: 4.8,
-      reviews: 124,
-      images: [
-        'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400',
-        'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=400',
-        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400',
-        'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=400',
-        'https://images.unsplash.com/photo-1600566753151-384129cf4e3e?w=400'
-      ],
-    },
-    {
-      id: 2,
-      title: 'Modern Penthouse',
-      location: 'New York, USA',
-      price: '$5.8M',
-      bedrooms: 3,
-      bathrooms: 2,
-      area: 2800,
-      trending: false,
-      featured: false,
-      rating: 4.6,
-      reviews: 89,
-      images: [
-        'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400',
-        'https://images.unsplash.com/photo-1600607687644-c7171b42498b?w=400',
-        'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=400',
-        'https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=400',
-        'https://images.unsplash.com/photo-1600566752355-35792bedcfea?w=400'
-      ],
-    },
-    {
-      id: 3,
-      title: 'Beachfront Apartment',
-      location: 'California, USA',
-      price: '$2.1M',
-      bedrooms: 2,
-      bathrooms: 2,
-      area: 1800,
-      trending: true,
-      featured: false,
-      rating: 4.9,
-      reviews: 156,
-      images: [
-        'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400',
-        'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?w=400',
-        'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=400',
-        'https://images.unsplash.com/photo-1600585154363-67eb9e2e2099?w=400',
-        'https://images.unsplash.com/photo-1600566752734-d1d4e5c6c9c6?w=400'
-      ],
-    },
-  ];
-
-  const upcomingData = [
-    {
-      id: 1,
-      title: 'Skyline Towers Phase 2',
-      location: 'Downtown, Metro City',
-      price: '₹1.2Cr',
-      originalPrice: '₹1.5Cr',
-      bedrooms: 3,
-      bathrooms: 2,
-      area: 1800,
-      trending: true,
-      featured: true,
-      rating: 4.9,
-      reviews: 89,
-      date: 'Q2 2024',
-      description: 'Premium residential towers with world-class amenities. Pre-booking available with special early bird discounts.',
-      images: [
-        'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400',
-        'https://images.unsplash.com/photo-1600607687644-c7171b42498b?w=400',
-        'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=400',
-        'https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=400'
-      ],
-    },
-    {
-      id: 2,
-      title: 'Green Valley Residences',
-      location: 'Suburban District',
-      price: '₹85L',
-      originalPrice: '₹95L',
-      bedrooms: 2,
-      bathrooms: 2,
-      area: 1200,
-      trending: false,
-      featured: false,
-      rating: 4.7,
-      reviews: 156,
-      date: 'Q3 2024',
-      description: 'Eco-friendly residential complex with sustainable features and modern amenities.',
-      images: [
-        'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400',
-        'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?w=400',
-        'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=400',
-        'https://images.unsplash.com/photo-1600585154363-67eb9e2e2099?w=400'
-      ],
-    },
-    {
-      id: 3,
-      title: 'Marina Bay Luxury',
-      location: 'Waterfront District',
-      price: '₹2.8Cr',
-      originalPrice: '₹3.2Cr',
-      bedrooms: 4,
-      bathrooms: 3,
-      area: 2500,
-      trending: true,
-      featured: true,
-      rating: 4.8,
-      reviews: 234,
-      date: 'Q4 2024',
-      description: 'Exclusive waterfront luxury apartments with private marina access and premium finishes.',
-      images: [
-        'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400',
-        'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=400',
-        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400',
-        'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=400'
-      ],
-    },
-  ];
-
-  const goldData = [
-    {
-      id: 1,
-      title: 'Gold Bullion 1oz',
-      description: '99.9% Pure Gold Bar',
-      price: '$2,045',
-      originalPrice: '$2,100',
-      weight: '1 Troy Oz',
-      purity: '99.9%',
-      trending: true,
-      certified: true,
-      change: '+2.3%',
-      images: [
-        'https://images.unsplash.com/photo-1610375461246-83df859d849d?w=400',
-        'https://images.unsplash.com/photo-1641897620206-b3f1b23a0e67?w=400',
-        'https://images.unsplash.com/photo-1610375461456-8e2d2d6da8d6?w=400',
-        'https://images.unsplash.com/photo-1600607687312-e06b0b10e1b4?w=400'
-      ],
-    },
-    {
-      id: 2,
-      title: 'Gold Coins Set',
-      description: 'American Eagle Collection',
-      price: '$8,200',
-      weight: '4 Troy Oz',
-      purity: '99.99%',
-      certified: true,
-      change: '+1.8%',
-      images: [
-        'https://images.unsplash.com/photo-1641897620206-b3f1b23a0e67?w=400',
-        'https://images.unsplash.com/photo-1610375461246-83df859d849d?w=400',
-        'https://images.unsplash.com/photo-1600607687312-e06b0b10e1b4?w=400',
-        'https://images.unsplash.com/photo-1610375461456-8e2d2d6da8d6?w=400'
-      ],
-    },
-    {
-      id: 3,
-      title: 'Investment Gold',
-      description: 'Swiss Mint Certificate',
-      price: '$12,300',
-      weight: '6 Troy Oz',
-      purity: '99.9%',
-      certified: true,
-      change: '+3.1%',
-      images: [
-        'https://images.unsplash.com/photo-1610375461456-8e2d2d6da8d6?w=400',
-        'https://images.unsplash.com/photo-1610375461246-83df859d849d?w=400',
-        'https://images.unsplash.com/photo-1641897620206-b3f1b23a0e67?w=400',
-        'https://images.unsplash.com/photo-1600607687312-e06b0b10e1b4?w=400'
-      ],
-    },
-  ];
-
-  const tokenizationData = [
-    {
-      id: 1,
-      title: 'Real Estate Token',
-      description: 'Fractional Property Ownership',
-      price: '$500',
-      yield: '8.5% APY',
-      tokens: '1000 RET',
-      volume: '$2.4M',
-      holders: '1.2k',
-      verified: true,
-      images: [
-        'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400',
-        'https://images.unsplash.com/photo-1634973357973-f2ed2657db3c?w=400',
-        'https://images.unsplash.com/photo-1639762681057-408e52192e55?w=400',
-        'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=400'
-      ],
-    },
-    {
-      id: 2,
-      title: 'Art Collection NFT',
-      description: 'Digital Art Investment',
-      price: '$1,200',
-      yield: '12% APY',
-      tokens: '50 ART',
-      volume: '$890k',
-      holders: '856',
-      verified: true,
-      images: [
-        'https://images.unsplash.com/photo-1634973357973-f2ed2657db3c?w=400',
-        'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400',
-        'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=400',
-        'https://images.unsplash.com/photo-1639762681057-408e52192e55?w=400'
-      ],
-    },
-    {
-      id: 3,
-      title: 'Commodity Token',
-      description: 'Diversified Asset Pool',
-      price: '$750',
-      yield: '6.8% APY',
-      tokens: '500 COM',
-      volume: '$1.1M',
-      holders: '923',
-      verified: false,
-      images: [
-        'https://images.unsplash.com/photo-1639762681057-408e52192e55?w=400',
-        'https://images.unsplash.com/photo-1634973357973-f2ed2657db3c?w=400',
-        'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400',
-        'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=400'
-      ],
-    },
-  ];
-
-  const greenData = [
-    {
-      id: 1,
-      title: 'Solar Energy Fund',
-      description: 'Renewable Energy Investment',
-      price: '$2,500',
-      impact: '5 tons CO2 saved',
-      return: '7.2% APY',
-      risk: 'Low',
-      duration: '24 months',
-      certified: true,
-      images: [
-        'https://images.unsplash.com/photo-1508514177221-188b1cf16e9d?w=400',
-        'https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=400',
-        'https://images.unsplash.com/photo-1569163139394-de4e4f43e4e5?w=400',
-        'https://images.unsplash.com/photo-1548337138-e87d889cc369?w=400'
-      ],
-    },
-    {
-      id: 2,
-      title: 'Wind Farm Project',
-      description: 'Clean Energy Portfolio',
-      price: '$4,800',
-      impact: '12 tons CO2 saved',
-      return: '8.9% APY',
-      risk: 'Medium',
-      duration: '36 months',
-      certified: true,
-      images: [
-        'https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=400',
-        'https://images.unsplash.com/photo-1508514177221-188b1cf16e9d?w=400',
-        'https://images.unsplash.com/photo-1548337138-e87d889cc369?w=400',
-        'https://images.unsplash.com/photo-1569163139394-de4e4f43e4e5?w=400'
-      ],
-    },
-    {
-      id: 3,
-      title: 'Carbon Credits',
-      description: 'Environmental Offset Investment',
-      price: '$1,800',
-      impact: '3 tons CO2 offset',
-      return: '5.5% APY',
-      risk: 'Low',
-      duration: '12 months',
-      certified: false,
-      images: [
-        'https://images.unsplash.com/photo-1569163139394-de4e4f43e4e5?w=400',
-        'https://images.unsplash.com/photo-1508514177221-188b1cf16e9d?w=400',
-        'https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=400',
-        'https://images.unsplash.com/photo-1548337138-e87d889cc369?w=400'
-      ],
-    },
-  ];
-
-  const getCurrentData = () => {
-    switch (activeTab) {
-      case 'All':
-        // Only show real estate and tokenization cards in the All tab, and set correct type for each
-        const allData = [
-          ...realEstateData.map(item => ({ ...item, category: 'Real Estate', type: 'realestate' })),
-          ...tokenizationData.map(item => ({ ...item, category: 'Tokenization', type: 'tokenization' })),
-        ];
-        return { data: allData, type: 'all' };
-      case 'Real Estate':
-        return { data: realEstateData, type: 'realestate' };
-      case 'Upcoming':
-        return { data: upcomingData, type: 'upcoming' };
-      case 'Gold':
-        return { data: goldData, type: 'gold' };
-      case 'Tokenization':
-        return { data: tokenizationData, type: 'tokenization' };
-      case 'Green':
-        return { data: greenData, type: 'green' };
-      default:
-        return { data: realEstateData, type: 'realestate' };
-    }
-  };
-
-
-  const handleCardPress = (item, type) => {
-    let screen = 'RealEstateSingleView';
-    switch (type) {
-      case 'gold':
-      case 'Gold':
-        screen = 'GoldSingleView';
-        break;
-      case 'financial':
-      case 'Financial':
-        screen = 'FinancialSingleView';
-        break;
-      case 'green':
-      case 'Green':
-        screen = 'GreenSingleView';
-        break;
-      case 'tokenization':
-      case 'Tokenization':
-        screen = 'TokenizationSingleView';
-        break;
-      case 'realestate':
-      case 'Real Estate':
-        screen = 'RealEstateSingleView';
-        break;
-      default:
-        screen = 'RealEstateSingleView';
-    }
-    navigation.navigate(screen, { item, type });
-  };
-
-  const handleBuy = (item) => {
-    // Handle buy action
-    console.log('Buy pressed for:', item.title);
-    // Add your buy logic here
-  };
-
-  const handleFavorite = (item) => {
-    // Handle favorite action
-    console.log('Favorite pressed for:', item.title);
-    // Add your favorite logic here
-  };
-
-  const { data, type } = getCurrentData();
+    const interval = setInterval(() => {
+      let nextIndex = currentIndex + 1;
+      if (nextIndex >= images.length) nextIndex = 0;
+      flatListRef.current?.scrollToOffset({ offset: nextIndex * SCREEN_WIDTH, animated: true });
+      setCurrentIndex(nextIndex);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [currentIndex, images.length]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      
-      {/* Navbar */}
-      <Navbar />
-      
-      <View style={{ flex: 1, backgroundColor: '#fff' }}>
-        <ScrollView
-          ref={scrollRef}
-          style={{ flex: 1, backgroundColor: '#fff' }}
-          contentContainerStyle={{ paddingBottom: 200, paddingTop: 100, backgroundColor: '#fff' }} // Adjusted top padding for smaller navbar
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Cards */}
-          <Animated.View
-            className="px-4 pt-2"
-            style={{
-              opacity: contentAnim,
-              transform: [
-                {
-                  translateY: contentAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [30, 0],
-                  }),
-                },
-              ],
-            }}
-          >
-            {data.map((item, index) => (
-              <Animated.View
-                key={item.id}
-                style={{
-                  opacity: contentAnim,
-                  transform: [
-                    {
-                      translateY: contentAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [50 + index * 20, 0],
-                      }),
-                    },
-                  ],
-                }}
-              >
-                <Cards
-                  item={item}
-                  type={item.type || type}
-                  activeTab={activeTab}
-                  onPress={() => handleCardPress(item, item.type || type)}
-                  onBuy={handleBuy}
-                  onFavorite={handleFavorite}
-                />
-              </Animated.View>
-            ))}
-          </Animated.View>
-        </ScrollView>
-
-        {/* Fixed Bottom Bar: Tabs */}
-        <View style={{ position: 'absolute', left: 0, right: 0, backgroundColor: '#fff', zIndex: 10, borderTopWidth: 1, borderTopColor: '#eee', shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 8 }}>
-          <View>
-            <Tabs tabData={tabData} activeTab={activeTab} setActiveTab={setActiveTab} />
-          </View>
-        </View>
-
-        {/* Bottom Navigation (already fixed) */}
-        <BottomNav />
+    <View style={styles.sliderContainer}>
+      <FlatList
+        ref={flatListRef}
+        data={images}
+        keyExtractor={(_, index) => index.toString()}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+          { useNativeDriver: false, listener: (event) => {
+              const offsetX = event.nativeEvent.contentOffset.x;
+              setCurrentIndex(Math.round(offsetX / SCREEN_WIDTH));
+            } }
+        )}
+        renderItem={({ item }) => (
+          <Image source={item} style={styles.sliderImage} resizeMode="cover" />
+        )}
+      />
+      <View style={styles.pagination}>
+        {images.map((_, i) => (
+          <Animated.View key={i.toString()} style={[styles.dot, { opacity: currentIndex === i ? 1 : 0.3 }]} />
+        ))}
       </View>
     </View>
   );
-};
+}
 
-export default MarketScreen;
+function AssetCard({ asset, animatedStyle, onPress }) {
+  const onFavoritePress = () => {};
+  const onSharePress = () => {
+    Share.share({ message: `Check out this asset: ${asset.name} for ${asset.price}!` });
+  };
+
+  return (
+    <TouchableOpacity activeOpacity={0.85} onPress={onPress}>
+      <Animated.View style={[styles.assetCard, animatedStyle]}>
+        <View style={styles.imageWrapper}>
+          <ImageSlider images={asset.images} />
+
+          {/* Category tag at top of image with green bg */}
+          <View style={styles.topTagRow}>
+            <View style={styles.topTag}>
+              <Text style={styles.topTagText}>{asset.category}</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity style={[styles.iconBtn, styles.favBtn]} onPress={onFavoritePress}>
+            <Icon name="heart" size={20} color="white" />
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.iconBtn, styles.shareBtn]} onPress={onSharePress}>
+            <Icon name="share-2" size={20} color="white" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.assetContent}>
+          <View style={styles.rowBetween}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.assetTitle} numberOfLines={1}>{asset.name}</Text>
+              <Text style={styles.assetLocation}>{asset.location}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={styles.assetPrice}>{asset.price}</Text>
+              <ReviewStars rating={asset.rating} reviews={asset.reviews} />
+            </View>
+          </View>
+        </View>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
+export default function MarketplaceScreen({ navigation }) {
+  const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [showSearch, setShowSearch] = useState(false);
+
+  const [animatedValues, setAnimatedValues] = useState({ translateY: [], opacity: [] });
+
+  const filteredAssets = useMemo(() => {
+    return ASSETS.filter(asset => {
+      const matchesSearch = asset.name.toLowerCase().includes(search.toLowerCase());
+      const matchesCategory = selectedCategory === 'All' || asset.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [search, selectedCategory]);
+
+  useEffect(() => {
+    const translateYs = filteredAssets.map(() => new Animated.Value(50));
+    const opacities = filteredAssets.map(() => new Animated.Value(0));
+    setAnimatedValues({ translateY: translateYs, opacity: opacities });
+  }, [filteredAssets]);
+
+  useEffect(() => {
+    if (!animatedValues.translateY.length) return;
+
+    const animations = animatedValues.translateY.map((translateY, i) =>
+      Animated.parallel([
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 600,
+          delay: i * 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedValues.opacity[i], {
+          toValue: 1,
+          duration: 600,
+          delay: i * 150,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    Animated.stagger(150, animations).start();
+  }, [animatedValues]);
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* Background Gradient */}
+      <LinearGradient
+        colors={[COLORS.backgroundGradient1, COLORS.backgroundGradient2, COLORS.backgroundGradient3]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      >
+        <LinearGradient
+          colors={["rgba(255,255,255,0.02)", "rgba(0,0,0,0.6)"]}
+          style={StyleSheet.absoluteFillObject}
+        />
+      </LinearGradient>
+
+      <SafeAreaView style={{ flex: 1 }}>
+        <Navbar />
+
+        {/* Header */}
+        <View style={styles.headerBar}>
+          {!showSearch ? (
+            <>
+              <Text style={styles.heading}>Explore Marketplace</Text>
+              <TouchableOpacity onPress={() => setShowSearch(true)}>
+                <Icon style={styles.search} name="search" size={18} color={COLORS.accentColor} />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <View style={styles.searchWrapper}>
+              <TextInput
+                placeholder="Search assets..."
+                placeholderTextColor="#aaa"
+                value={search}
+                onChangeText={setSearch}
+                style={styles.searchInput}
+                autoFocus
+              />
+              <TouchableOpacity onPress={() => { setShowSearch(false); setSearch(''); }}>
+                <Icon name="x" size={18} color={COLORS.accentColor} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* Categories */}
+        <View style={styles.categoriesWrapper}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {categories.map(cat => {
+              const active = selectedCategory === cat.key;
+              return (
+                <TouchableOpacity
+                  key={cat.key}
+                  style={[styles.categoryTabWrapper, active && styles.categoryTabWrapperActive]}
+                  onPress={() => setSelectedCategory(cat.key)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.tabInner}>
+                    {active && (
+                      <Icon
+                        name={cat.icon}
+                        size={16}
+                        color={COLORS.starEmpty}
+                        style={{ marginRight: 6 }}
+                      />
+                    )}
+                    <Text
+                      style={[
+                        styles.categoryTabLabel,
+                        active ? styles.categoryTabLabelActive : styles.categoryTabLabelInactive,
+                      ]}
+                    >
+                      {cat.label}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Cards with animation */}
+        <FlatList
+          data={filteredAssets}
+          keyExtractor={item => item.id}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item, index }) => (
+            <AssetCard
+              asset={item}
+              animatedStyle={{
+                transform: [{ translateY: animatedValues.translateY[index] || new Animated.Value(0) }],
+                opacity: animatedValues.opacity[index] || new Animated.Value(1),
+              }}
+              onPress={() => navigation.navigate('AssetDetails', { asset: item })}
+            />
+          )}
+        />
+
+        <BottomNav />
+      </SafeAreaView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  headerBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: "center",
+    paddingHorizontal: 16,
+    marginTop: 50,
+    marginBottom: 12,
+  },
+  heading: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: COLORS.accentColor,
+    marginTop: 50,
+  },
+  search: {
+    marginTop: 50,
+    color: COLORS.accentColor,
+  },
+  searchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    flex: 1,
+    height: 40,
+    marginTop: 50,
+  },
+  searchInput: {
+    flex: 1,
+    color: COLORS.accentColor,
+    paddingHorizontal: 8,
+  },
+  categoriesWrapper: {
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  categoryTabWrapper: {
+    marginRight: 20,
+    justifyContent: "center",
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+  },
+  categoryTabWrapperActive: {
+    borderBottomColor: COLORS.starEmpty,
+  },
+  tabInner: { flexDirection: 'row', alignItems: 'center' },
+  categoryTabLabel: {
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  categoryTabLabelInactive: {
+    color: '#aaa',
+  },
+  categoryTabLabelActive: {
+    color: COLORS.starEmpty,
+    fontWeight: 'bold',
+  },
+  assetCard: {
+    backgroundColor: COLORS.cardBackground,
+    marginHorizontal: 16,
+    marginBottom: 24,
+    overflow: 'hidden',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    width: SCREEN_WIDTH - 32,
+    alignSelf: 'center',
+  },
+  sliderContainer: { width: '100%', height: 180 },
+  sliderImage: {
+    width: SCREEN_WIDTH - 32,
+    height: 180,
+  },
+  pagination: {
+    position: 'absolute',
+    bottom: 8,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  dot: { height: 8, width: 8, borderRadius: 4, backgroundColor: '#fff', marginHorizontal: 4 },
+  iconBtn: {
+    position: 'absolute',
+    top: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  favBtn: { right: 44 },
+  shareBtn: { right: 14 },
+  topTagRow: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    flexDirection: 'row',
+  },
+  topTag: {
+    backgroundColor: 'rgba(0,150,100,0.8)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  topTagText: {
+    color: COLORS.accentColor,
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  assetContent: { paddingHorizontal: 12, paddingVertical: 10 },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  assetTitle: { fontWeight: 'bold', color: COLORS.accentColor, fontSize: 18, flex: 1, marginBottom: 4 },
+  assetLocation: { fontSize: 14, color: COLORS.accentColor },
+  reviewContainer: { flexDirection: 'row', alignItems: 'center' },
+  assetPrice: {
+    fontWeight: 'bold',
+    color: COLORS.accentColor,
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  reviewText: {
+    color: COLORS.accentColor,
+    fontSize: 12,
+    marginLeft: 6,
+    fontWeight: '600',
+  },
+});
