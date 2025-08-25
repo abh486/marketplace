@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';ghhghg
 
 const SignIn = () => {
   const [gmail, setGmail] = useState('abhishekhvk123@gmail.com');
