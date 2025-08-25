@@ -7,12 +7,6 @@ import LogIn from '../screens/LogIn';
 import SignIn from '../screens/SignUp';
 import OnboardingScreen from '../screens/OnboardingScreen';
 
-// import AllScreen from '../screens/AllScreen';
-
-// import TokenizationScreen from '../screens/Tokenization/TokenizationScreen';
-// import GreenScreen from '../screens/Green/GreenScreen';
-// import FinancialScreen from '../screens/Financial/FinancialScreen';
-// import GoldScreen from '../screens/Gold/GoldScreen';
 import RealEstateSingleView from '../screens/properties/RealEstateSingleView';
 import WalletInterface from '../screens/wallet/WalletInterface';
 import Profile from '../screens/profile/Profile';
@@ -20,17 +14,19 @@ import MapScreen from '../screens/properties/MapScreen';
 import GoldSingleView from '../screens/Gold/GoldSingleView';
 import GreenSingleView from '../screens/Green/GreenSingleView';
 import FinancialSingleView from '../screens/Financial/FinancialSingleView';
-import TokenizationSingleView from '../screens/Tokenization/TokenizationSingleView';
 import Home from '../screens/home/Home';
-
+import ZeroPage from '../screens/properties/ZeroPage';
+import AssetDetails from '../screens/properties/AssetDetails';
 import MarketScreen from '../screens/properties/MarketScreen';
+import PortfolioScreen from '../screens/properties/PortfolioScreen';
+
 
 const Stack = createNativeStackNavigator();
 
 const AppNavigator = () => {
   return (
       <NavigationContainer>
-      <Stack.Navigator initialRouteName="MarketScreen">
+      <Stack.Navigator initialRouteName="Home">
 
 
 
@@ -64,20 +60,7 @@ const AppNavigator = () => {
          <Stack.Screen name="FinancialSingleView" component={FinancialSingleView}
          options={{ headerShown: false }}  />
 
-          <Stack.Screen name="TokenizationSingleView" component={TokenizationSingleView}
-         options={{ headerShown: false }}  />
 
-        {/* <Stack.Screen name="TokenizationScreen" component={TokenizationScreen}
-        options={{ headerShown: false }}  />
-
-        <Stack.Screen name="GreenScreen" component={GreenScreen}
-        options={{ headerShown: false }}  />
-
-        <Stack.Screen name="FinancialScreen" component={FinancialScreen} 
-        options={{ headerShown: false }} />
-        
-        <Stack.Screen name="GoldScreen" component={GoldScreen} 
-        options={{ headerShown: false }} /> */}
 
         <Stack.Screen name="Home" component={Home}
         options={{ headerShown: false }}  />
@@ -93,7 +76,13 @@ const AppNavigator = () => {
 
         <Stack.Screen name="Marketplace" component={MarketScreen}
          options={{ headerShown: false }}  />
-
+        <Stack.Screen name="ZeroPage" component={ZeroPage}
+         options={{ headerShown: false }}  />
+        <Stack.Screen name="AssetDetails" component={AssetDetails}
+         options={{ headerShown: false }}  />
+         <Stack.Screen name="PortfolioScreen" component={PortfolioScreen}
+         options={{ headerShown: false }}  />
+        
 
 
 

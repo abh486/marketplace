@@ -3,7 +3,6 @@ import {
   View,
   StyleSheet,
   StatusBar,
-  Image,
   TouchableOpacity,
   Text,
   Modal,
@@ -12,9 +11,6 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 
 const HEADER_HEIGHT = 80;
-
-// Example notification count (replace with your state/props)
-const notificationCount = 7;
 
 const Navbar = () => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -41,25 +37,8 @@ const Navbar = () => {
     <View style={styles.headerContainer}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
-      {/* Logo on the left */}
-      <View style={styles.logoContainer}>
-        <Image
-          source={require('../../assets/image/Copym-01.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-      </View>
-
-      {/* Right side: Notification and Hamburger Menu */}
+      {/* Right side: Hamburger Menu Only */}
       <View style={styles.rightButtonsContainer}>
-        <TouchableOpacity style={styles.iconButton} onPress={() => { /* handle notifications */ }}>
-          <Icon name="notifications-outline" size={22} color="#000" />
-          {notificationCount > 0 && (
-            <View style={styles.badgeContainer}>
-              <Text style={styles.badgeText}>{notificationCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
         <TouchableOpacity style={styles.iconButton} onPress={openModal}>
           <View style={styles.hamburgerIcon}>
             <View style={styles.hamburgerLine} />
@@ -107,10 +86,6 @@ const Navbar = () => {
                     <Icon name="person-outline" size={20} color="#255f99" />
                     <Text style={styles.headerOptionText}>Profile</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.headerOption} onPress={() => { /* handle notification */ }}>
-                    <Icon name="notifications-outline" size={20} color="#255f99" />
-                    <Text style={styles.headerOptionText}>Notification</Text>
-                  </TouchableOpacity>
                   <TouchableOpacity style={styles.headerOption} onPress={() => { /* handle investment */ }}>
                     <Icon name="trending-up-outline" size={20} color="#255f99" />
                     <Text style={styles.headerOptionText}>Investment</Text>
@@ -132,88 +107,60 @@ const styles = StyleSheet.create({
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     height: HEADER_HEIGHT,
-    zIndex: 1000, // Increased zIndex to ensure visibility
-    backgroundColor: '#fff', // Added background color
+    zIndex: 1000,
+    backgroundColor: '#012419ff',
     paddingHorizontal: 20,
-    paddingTop: 40, // Account for status bar
+    paddingTop: 30,
+   
   },
-  logoContainer: {
-    flex: 0,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  logo: {
-    width: 80,
-    height: 50,
-    borderRadius: 8,
-  },
-
   rightButtonsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     position: 'absolute',
     right: 20,
-    top: 40, // Match paddingTop of headerContainer
-    zIndex: 1001, // Higher than header zIndex
+    top: 40,
+    zIndex: 1001,
   },
   iconButton: {
     marginLeft: 16,
-    padding: 4, // Add touch area
-  },
-  badgeContainer: {
-    position: 'absolute',
-    right: -6,
-    top: -6,
-    backgroundColor: '#ff4757',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: 'bold',
+    padding: 4,
   },
   hamburgerIcon: {
     width: 20,
-    height: 16,
+    height: 15,
     justifyContent: 'space-between',
   },
   hamburgerLine: {
     width: 20,
     height: 2,
-    backgroundColor: '#000',
+    backgroundColor: '#ffffffff',
     borderRadius: 1,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,16,32,0.83)',
     justifyContent: 'flex-start',
     alignItems: 'center',
     paddingTop: HEADER_HEIGHT,
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: '#1d3125',
     width: '90%',
     maxHeight: 400,
     borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
+    shadowColor: '#00ff66',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.17,
     shadowRadius: 10,
     elevation: 10,
+    borderWidth: 1.1,
+    borderColor: '#00ff6633',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -222,7 +169,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#222',
   },
   headerOptions: {
     flexDirection: 'row',
@@ -235,9 +182,10 @@ const styles = StyleSheet.create({
   },
   headerOptionText: {
     fontSize: 12,
-    fontWeight: '500',
-    color: '#255f99',
+    fontWeight: '600',
+    color: '#00ff66',
     marginTop: 4,
+    letterSpacing: 0.5,
   },
 });
 

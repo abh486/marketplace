@@ -1,1470 +1,775 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
-  Animated,
-  StatusBar,
-  SafeAreaView,
-  Dimensions,
-  Alert,
   ScrollView,
-  FlatList,
-  Image,
-} from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop, Path } from 'react-native-svg';
-import ModalComponent from './ModalComponent';
-import SuccessModal from './SuccessModal';
-import BottomNav from '../properties/BottomNav';
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
+  Clipboard,
+  Platform,
+} from "react-native";
+import LinearGradient from "react-native-linear-gradient";
+import Icon from "react-native-vector-icons/Feather";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
+import Navbar from "../properties/Navbar";
+import BottomNav from "../properties/BottomNav";
 
+// ----------------- Mock Data -----------------
+const tokens = [
+  { id: 1, symbol: "ETH", name: "Ethereum", price: 3050.25, quantity: 2.45 },
+  { id: 2, symbol: "BTC", name: "Bitcoin", price: 61000.0, quantity: 0.5 },
+  { id: 3, symbol: "USDT", name: "Tether", price: 1.0, quantity: 1500.0 },
+  { id: 4, symbol: "DAI", name: "Dai", price: 0.998, quantity: 875.3 },
+];
 
-const { height, width } = Dimensions.get('window');
+const tokenizedAssets = [
+  { id: 1, name: "Luxury Apartment", type: "Real Estate", price: 2500, quantity: 2 },
+  { id: 2, name: "Gold Token", type: "Gold", price: 60, quantity: 10 },
+];
 
-const WalletInterface = () => {
-  const [selectedTab, setSelectedTab] = useState('M');
-  const [walletBalance, setWalletBalance] = useState(1000);
-  const [displayBalance, setDisplayBalance] = useState(1000);
-  const [totalYield] = useState(0);
-  const [isBalanceVisible, setIsBalanceVisible] = useState(true);
-  const [isAmountVisible, setIsAmountVisible] = useState(true);
+const transactions = [
+  { id: 1, token: "ETH", amount: 1.2, type: "sent", date: "2023-10-05", status: "completed", txId: "0xabc123..." },
+  { id: 2, token: "BTC", amount: 0.1, type: "received", date: "2023-10-04", status: "completed", txId: "0xdef456..." },
+  { id: 3, token: "USDT", amount: 500, type: "sent", date: "2023-10-03", status: "failed", txId: "0xghi789..." },
+  { id: 4, token: "DAI", amount: 200, type: "received", date: "2023-10-02", status: "completed", txId: "0xjkl012..." },
+];
 
-  const [selectedView, setSelectedView] = useState('overview'); // overview only
+const wallets = [
+  { id: 1, name: "Main Wallet", address: "0x1a2b...cdef" },
+  { id: 2, name: "Savings Wallet", address: "0x3c4d...ef12" },
+  { id: 3, name: "Trading Wallet", address: "0x5e6f...34ab" },
+];
 
-  // Modal states
-  const [activeModal, setActiveModal] = useState(null);
-  const [amount, setAmount] = useState('');
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('card');
-  const [walletAddress, setWalletAddress] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
+export default function WalletInterface() {
+  const [activeTab, setActiveTab] = useState("tokens");
+  const [sendModalVisible, setSendModalVisible] = useState(false);
+  const [receiveModalVisible, setReceiveModalVisible] = useState(false);
+  const [swapModalVisible, setSwapModalVisible] = useState(false);
+  const [depositModalVisible, setDepositModalVisible] = useState(false);
+  const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
+  const [selectedWallet, setSelectedWallet] = useState(wallets[0]);
+  const [totalBalance, setTotalBalance] = useState(0);
 
-  // Success Modal state
-  const [successModalVisible, setSuccessModalVisible] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
+  const username = "Sam Kruss";
 
-  // Animation values
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const modalAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const actionAnim1 = useRef(new Animated.Value(0)).current;
-  const actionAnim2 = useRef(new Animated.Value(0)).current;
-  const actionAnim3 = useRef(new Animated.Value(0)).current;
-
-  // Mock transaction history
-  const [transactions] = useState([
-    {
-      id: '1',
-      type: 'deposit',
-      amount: 500,
-      date: '2024-01-15',
-      status: 'completed',
-      description: 'Bank Transfer',
-      icon: '🏦'
-    },
-    {
-      id: '2',
-      type: 'withdraw',
-      amount: 200,
-      date: '2024-01-14',
-      status: 'completed',
-      description: 'To External Wallet',
-      icon: '📤'
-    },
-    {
-      id: '3',
-      type: 'receive',
-      amount: 150,
-      date: '2024-01-13',
-      status: 'completed',
-      description: 'From User123',
-      icon: '📥'
-    },
-    {
-      id: '4',
-      type: 'deposit',
-      amount: 300,
-      date: '2024-01-12',
-      status: 'pending',
-      description: 'Credit Card',
-      icon: '💳'
-    }
-  ]);
-
-
-
+  // Calculate total balance from tokens + tokenized assets
   useEffect(() => {
-    // Much faster countdown animation from 1000 to 0
-    const countdown = setInterval(() => {
-      setDisplayBalance(prev => {
-        if (prev <= 0) {
-          clearInterval(countdown);
-          return 0;
-        }
-        return prev - 20; // Increased from 10 to 50 for 5x speed
-      });
-    }, 10); // Decreased from 50ms to 10ms for 5x speed
+    let total = 0;
+    tokens.forEach((t) => (total += t.price * t.quantity));
+    tokenizedAssets.forEach((a) => (total += a.price * a.quantity));
+    setTotalBalance(total);
+  }, []);
 
-    startAnimations();
-
-    return () => clearInterval(countdown);
-  }, [startAnimations]);
-
-  const startAnimations = useCallback(() => {
-    // Pulse animation
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.05,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    // Rotation animation
-    Animated.loop(
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 20000,
-        useNativeDriver: true,
-      })
-    ).start();
-
-    // Slide animation for view transitions
-    Animated.timing(slideAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-
-    // Action button animations with staggered timing
-    Animated.stagger(200, [
-      Animated.timing(actionAnim1, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(actionAnim2, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(actionAnim3, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-
-  }, [pulseAnim, rotateAnim, slideAnim, actionAnim1, actionAnim2, actionAnim3]);
-
-  const handleTabPress = (tab) => {
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 0.95,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    setSelectedTab(tab);
+  // Handlers
+  const handleSend = () => {
+    Alert.alert("Transaction", "Send initiated!");
+    setSendModalVisible(false);
+  };
+  const handleSwap = () => {
+    Alert.alert("Swap", "Swap initiated!");
+    setSwapModalVisible(false);
+  };
+  const handleDeposit = () => {
+    Alert.alert("Deposit", "Deposit flow started...");
+    setDepositModalVisible(false);
+  };
+  const handleWithdraw = () => {
+    Alert.alert("Withdraw", "Withdraw flow started...");
+    setWithdrawModalVisible(false);
   };
 
-  const toggleAmountVisibility = () => {
-    setIsAmountVisible(!isAmountVisible);
+  const copyToClipboard = (text) => {
+    Clipboard.setString(text);
+    Alert.alert("Copied", "Address copied to clipboard!");
   };
 
-
-
-  const openModal = (modalType) => {
-    setActiveModal(modalType);
-    setAmount('');
-    setWalletAddress('');
-    Animated.timing(modalAnim, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const closeModal = () => {
-    Animated.timing(modalAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setActiveModal(null);
-      setIsProcessing(false);
-    });
-  };
-
-  const handleTransaction = async () => {
-    if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount');
-      return;
-    }
-
-    if (activeModal === 'withdraw' && parseFloat(amount) > walletBalance) {
-      Alert.alert('Insufficient Funds', 'You don\'t have enough balance');
-      return;
-    }
-
-    if ((activeModal === 'withdraw' || activeModal === 'receive') && !walletAddress) {
-      Alert.alert('Invalid Address', 'Please enter a valid wallet address');
-      return;
-    }
-
-    setIsProcessing(true);
-
-    setTimeout(() => {
-      const amountValue = parseFloat(amount);
-
-      if (activeModal === 'deposit') {
-        setWalletBalance(prev => prev + amountValue);
-        setDisplayBalance(prev => prev + amountValue);
-        setSuccessMessage(`Successfully deposited ${amountValue} EUR`);
-        setSuccessModalVisible(true);
-      } else if (activeModal === 'withdraw') {
-        setWalletBalance(prev => prev - amountValue);
-        setDisplayBalance(prev => prev - amountValue);
-        setSuccessMessage(`Successfully withdrew ${amountValue} EUR`);
-        setSuccessModalVisible(true);
-      } else if (activeModal === 'receive') {
-        setSuccessMessage(`Receive request sent for ${amountValue} EUR`);
-        setSuccessModalVisible(true);
-      }
-
-      closeModal();
-    }, 2000);
-  };
-
-  const CircularProgress = () => (
-    <Svg width={280} height={280} style={styles.progressSvg}>
-      <Defs>
-        <SvgLinearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-          <Stop offset="0%" stopColor="#FF6B9D" />
-          <Stop offset="50%" stopColor="#4FACFE" />
-          <Stop offset="100%" stopColor="#9B59B6" />
-        </SvgLinearGradient>
-      </Defs>
-      <Circle
-        cx={140}
-        cy={140}
-        r={130}
-        stroke="rgba(255,255,255,0.1)"
-        strokeWidth={8}
-        fill="none"
-      />
-      <Circle
-        cx={140}
-        cy={140}
-        r={130}
-        stroke="url(#gradient)"
-        strokeWidth={8}
-        fill="none"
-        strokeDasharray="817"
-        strokeDashoffset="204"
-        strokeLinecap="round"
-        transform="rotate(-225 140 140)"
-      />
-    </Svg>
+  const renderTokens = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Assets</Text>
+      {tokens.map((token) => {
+        const totalValue = (token.price * token.quantity).toFixed(2);
+        return (
+          <View key={token.id} style={styles.tokenRow}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={styles.tokenIcon}>
+                <Text style={{ color: "#fff", fontSize: 12 }}>{token.symbol[0]}</Text>
+              </View>
+              <View>
+                <Text style={styles.tokenName}>{token.name}</Text>
+                <Text style={styles.tokenSymbol}>{token.symbol}</Text>
+              </View>
+            </View>
+            <View style={styles.tokenValues}>
+              <Text style={styles.tokenPrice}>${token.price.toFixed(2)}</Text>
+              <Text style={styles.tokenAmount}>{token.quantity} {token.symbol}</Text>
+              <Text style={styles.tokenTotal}>${totalValue}</Text>
+            </View>
+          </View>
+        );
+      })}
+      {tokenizedAssets.map((asset) => {
+        const totalValue = (asset.price * asset.quantity).toFixed(2);
+        return (
+          <View key={asset.id} style={styles.tokenRow}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={styles.tokenIcon}>
+                <Icon name="home" size={14} color="#fff" />
+              </View>
+              <View>
+                <Text style={styles.tokenName}>{asset.name}</Text>
+                <Text style={styles.tokenSymbol}>{asset.type}</Text>
+              </View>
+            </View>
+            <View style={styles.tokenValues}>
+              <Text style={styles.tokenPrice}>${asset.price.toFixed(2)}</Text>
+              <Text style={styles.tokenAmount}>{asset.quantity} units</Text>
+              <Text style={styles.tokenTotal}>${totalValue}</Text>
+            </View>
+          </View>
+        );
+      })}
+    </View>
   );
 
-  const rotate = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  const slideTranslate = slideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [width, 0],
-  });
-
-  // Action button animations
-  const action1Translate = actionAnim1.interpolate({
-    inputRange: [0, 1],
-    outputRange: [50, 0],
-  });
-
-  const action2Translate = actionAnim2.interpolate({
-    inputRange: [0, 1],
-    outputRange: [50, 0],
-  });
-
-  const action3Translate = actionAnim3.interpolate({
-    inputRange: [0, 1],
-    outputRange: [50, 0],
-  });
-
-
-
-  const renderTransactionItem = ({ item }) => (
-    <Animated.View style={[styles.transactionItem, { transform: [{ translateX: slideTranslate }] }]}>
-      <View style={styles.transactionIcon}>
-        <Text style={styles.transactionIconText}>{item.icon}</Text>
-      </View>
-      <View style={styles.transactionDetails}>
-        <Text style={styles.transactionDescription}>{item.description}</Text>
-        <Text style={styles.transactionDate}>{item.date}</Text>
-      </View>
-      <View style={styles.transactionAmount}>
-        <Text style={[
-          styles.transactionAmountText,
-          { color: item.type === 'withdraw' ? '#E74C3C' : '#27AE60' }
-        ]}>
-          {item.type === 'withdraw' ? '-' : '+'}{item.amount} EUR
-        </Text>
-        <View style={[
-          styles.statusBadge,
-          { backgroundColor: item.status === 'completed' ? '#27AE60' : '#F39C12' }
-        ]}>
-          <Text style={styles.statusText}>{item.status}</Text>
+  const renderHistory = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Transaction History</Text>
+      {transactions.map((tx) => (
+        <View key={tx.id} style={styles.historyItem}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <View
+              style={[
+                styles.historyIcon,
+                { backgroundColor: tx.type === "sent" ? "#fef2f2" : "#f0fdf4" },
+              ]}
+            >
+              <Icon
+                name={tx.type === "sent" ? "arrow-up-right" : "arrow-down-left"}
+                size={16}
+                color={tx.type === "sent" ? "#dc2626" : "#059669"}
+              />
+            </View>
+            <View>
+              <Text style={styles.historyToken}>
+                {tx.type === "sent" ? "Sent" : "Received"} {tx.amount} {tx.token}
+              </Text>
+              <Text style={styles.historyDate}>{tx.date}</Text>
+            </View>
+          </View>
+          <View style={{ alignItems: "flex-end" }}>
+            <Text
+              style={[
+                styles.historyStatus,
+                tx.status === "completed" ? { color: "#10b981" } : { color: "#f97316" },
+              ]}
+            >
+              {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
+            </Text>
+            <Text style={styles.txId} onPress={() => copyToClipboard(tx.txId)}>
+              {tx.txId}
+            </Text>
+          </View>
         </View>
-      </View>
-    </Animated.View>
+      ))}
+    </View>
   );
 
-
-
-
+  const renderAccounts = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Wallets & Accounts</Text>
+      {wallets.map((wallet) => (
+        <TouchableOpacity
+          key={wallet.id}
+          style={[
+            styles.walletItem,
+            selectedWallet?.id === wallet.id && styles.selectedWallet,
+          ]}
+          onPress={() => setSelectedWallet(wallet)}
+        >
+          <View>
+            <Text style={styles.walletName}>{wallet.name}</Text>
+            <Text style={styles.walletAddress} numberOfLines={1}>
+              {wallet.address}
+            </Text>
+          </View>
+          <Text style={styles.walletBalance}>
+            {wallet.id === 1 ? "$28,450" : wallet.id === 2 ? "$12,300" : "$4,480"}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+    <View style={{ flex: 1 }}>
+      {/* Background Gradient */}
       <LinearGradient
-        colors={['#FFE5E5', '#E5F3FF', '#F0E5FF']}
+        colors={["#001A13", "#003B28", "#017148ff"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.background}
-      >
+        style={StyleSheet.absoluteFillObject}
+      />
+
+      {/* Navbar */}
+      <Navbar title="Wallet" rightIcon="bell" />
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 90, flexGrow: 1 }}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.eyeButton}
-            onPress={() => {
-              setIsBalanceVisible(!isBalanceVisible);
-              setIsAmountVisible(!isAmountVisible);
-            }}
-          >
-                        <View style={styles.eyeIcon}>
-              <Text style={styles.eyeText}>
-                {isBalanceVisible ? '👁' : '👁‍🗨'}
-              </Text>
+        <View style={styles.headerContainer}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <View style={styles.avatar}>
+              <Text style={{ color: "#fff", fontWeight: "bold" }}>{username.charAt(0)}</Text>
             </View>
+            <View style={{ marginLeft: 10 }}>
+              <Text style={styles.welcomeText}>Welcome back!</Text>
+              <Text style={styles.userName}>{username}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Balance Circle */}
+        <View style={styles.centerWrapper}>
+          <View style={styles.arcContainer}>
+            <LinearGradient
+              colors={["#99c59d", "#309a5d", "#04523C"]}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              style={styles.gradientFullCircle}
+            />
+            <View style={styles.arcMask} />
+            <View style={styles.innerCircle}>
+              <View style={styles.innerCircleContent}>
+                <Text style={styles.balanceLabel}>Total Balance</Text>
+                <Text style={styles.balanceValue}>${totalBalance.toLocaleString()}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Quick Action Buttons */}
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => setSendModalVisible(true)}>
+            <View style={styles.actionIconCircle}>
+              <Icon name="arrow-up-right" size={20} color="#fff" />
+            </View>
+            <Text style={styles.actionButtonText}>Send</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => setReceiveModalVisible(true)}>
+            <View style={styles.actionIconCircle}>
+              <Icon name="arrow-down-left" size={20} color="#fff" />
+            </View>
+            <Text style={styles.actionButtonText}>Receive</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => setSwapModalVisible(true)}>
+            <View style={styles.actionIconCircle}>
+              <Icon name="shuffle" size={20} color="#fff" />
+            </View>
+            <Text style={styles.actionButtonText}>Swap</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => setDepositModalVisible(true)}>
+            <View style={styles.actionIconCircle}>
+              <Icon name="arrow-down-circle" size={20} color="#fff" />
+            </View>
+            <Text style={styles.actionButtonText}>Deposit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => setWithdrawModalVisible(true)}>
+            <View style={styles.actionIconCircle}>
+              <Icon name="arrow-up-circle" size={20} color="#fff" />
+            </View>
+            <Text style={styles.actionButtonText}>Withdraw</Text>
           </TouchableOpacity>
         </View>
 
+        {/* Tabs */}
+        <View style={styles.tabBar}>
+          {["tokens", "history", "accounts"].map((tab) => (
+            <TouchableOpacity key={tab} style={styles.tabButton} onPress={() => setActiveTab(tab)}>
+              <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </Text>
+              {activeTab === tab && <View style={styles.tabUnderline} />}
+            </TouchableOpacity>
+          ))}
+        </View>
 
+        {activeTab === "tokens" && renderTokens()}
+        {activeTab === "history" && renderHistory()}
+        {activeTab === "accounts" && renderAccounts()}
+      </ScrollView>
 
-        {/* Main Content */}
-        <ScrollView
-          style={styles.main}
-          contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-start' }}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Wallet Container */}
-          <View style={styles.walletContainer}>
-            {/* SVG Circle */}
-            <View style={styles.circleWrapper}>
-              <CircularProgress />
-              {/* Overlayed wallet info text, centered absolutely */}
-              <View style={styles.walletInfoOverlay}>
-                <Text style={styles.walletTitle}>My Wallet</Text>
-                <Text style={styles.walletAmount}>
-                  {isBalanceVisible ? `${displayBalance} €` : '••• €'}
-                </Text>
-                <View style={styles.yieldRow}>
-                  <Text style={styles.yieldIcon}>💎</Text>
-                  <Text style={styles.yieldLabel}>Total Yield</Text>
-                </View>
-                <Text style={styles.yieldAmount}>
-                  {isBalanceVisible ? `${totalYield} €` : '••• €'}
-                </Text>
-                {/* W, M, Y Tabs at the bottom of the circle */}
-                <Animated.View
-                  style={[styles.tabs, { transform: [{ scale: scaleAnim }] }]}
-                >
-                  {['W', 'M', 'Y'].map((tab) => (
-                    <TouchableOpacity
-                      key={tab}
-                      style={[styles.tab, selectedTab === tab && styles.activeTab]}
-                      onPress={() => handleTabPress(tab)}
-                    >
-                      <Text style={[
-                        styles.tabText,
-                        selectedTab === tab && styles.activeTabText
-                      ]}>
-                        {tab}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </Animated.View>
-              </View>
+      {/* Send Modal */}
+      <Modal visible={sendModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { width: "98%" }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "stretch" }}>
+              <TouchableOpacity onPress={() => setSendModalVisible(false)}>
+                <Icon name="arrow-left" size={24} color="#04523C" />
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { flex: 1, textAlign: "center", marginLeft: -24 }]}>Send Token</Text>
             </View>
-          </View>
-
-
-
-          {/* Card */}
-          <View style={styles.cardContainer}>
-            <View style={styles.card}>
-              {/* Premium Background Design */}
-              <View style={styles.cardBgDesign}>
-                <View style={styles.premiumCircle1} />
-                <View style={styles.premiumCircle2} />
-                <View style={styles.premiumCircle3} />
-                <View style={styles.premiumDiamond} />
-                <View style={styles.premiumLine1} />
-                <View style={styles.premiumLine2} />
-                <View style={styles.premiumDot1} />
-                <View style={styles.premiumDot2} />
-                <View style={styles.premiumDot3} />
-              </View>
-              
-              {/* Premium Bitcoin Icon */}
-              <View style={styles.premiumBitcoinBg}>
-                <Text style={styles.premiumBitcoinIcon}>₿</Text>
-              </View>
-              
-              {/* Premium Content */}
-              <View style={styles.premiumContent}>
-                <View style={styles.premiumHeader}>
-                  <Text style={styles.premiumTitle}>Euros Wallet</Text>
-                  <View style={styles.premiumBadge}>
-                    <Text style={styles.premiumBadgeText}>PREMIUM</Text>
-                  </View>
-                </View>
-                <Text style={styles.premiumAmount}>
-                  {isAmountVisible ? '0 EUR' : '•••'}
-                </Text>
-                <Text style={styles.premiumSubtext}>+ 0 EUR already purchased</Text>
-                <View style={styles.premiumAddress}>
-                  <Text style={styles.premiumAddressText}>0x25...0369</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Actions */}
-          <View style={styles.actions}>
-            <Animated.View style={[styles.actionButton, { 
-              transform: [
-                { translateY: action1Translate }
-              ] 
-            }]}> 
-              <TouchableOpacity onPress={() => openModal('receive')}>
-                <View style={[styles.actionIcon, { backgroundColor: '#FF6B9D' }]}> 
-                  <Text style={styles.actionIconText}>↓</Text> 
-                </View> 
-                <Text style={styles.actionLabel}>Receive</Text> 
-              </TouchableOpacity> 
-            </Animated.View> 
-
-            <Animated.View style={[styles.actionButton, { 
-              transform: [
-                { translateY: action2Translate }
-              ] 
-            }]}> 
-              <TouchableOpacity onPress={() => openModal('withdraw')}>
-                <View style={[styles.actionIcon, { backgroundColor: '#95A5A6' }]}> 
-                  <Text style={styles.actionIconText}>-</Text> 
-                </View> 
-                <Text style={styles.actionLabel}>Withdraw</Text> 
-              </TouchableOpacity> 
-            </Animated.View> 
-
-            <Animated.View style={[styles.actionButton, { 
-              transform: [
-                { translateY: action3Translate }
-              ] 
-            }]}> 
-              <TouchableOpacity onPress={() => openModal('deposit')}>
-                <View style={[styles.actionIcon, { backgroundColor: '#4FACFE' }]}> 
-                  <Text style={styles.actionIconText}>+</Text> 
-                </View> 
-                <Text style={styles.actionLabel}>Deposit</Text> 
-              </TouchableOpacity> 
-            </Animated.View>
-          </View>
-
-          {/* Recent Transactions */}
-          <View style={styles.transactionsContainer}>
-            <View style={styles.transactionsHeader}>
-              <Text style={styles.sectionTitle}>Recent Transactions</Text>
-              <TouchableOpacity>
-                <Text style={styles.viewAllText}>View All</Text>
+            <TextInput placeholder="Recipient Address" style={styles.input} multiline numberOfLines={2} />
+            <TextInput placeholder="Amount" style={styles.input} keyboardType="decimal-pad" />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
+                <Text style={styles.buttonText}>Send</Text>
               </TouchableOpacity>
             </View>
-            <FlatList
-              data={transactions.slice(0, 3)}
-              renderItem={renderTransactionItem}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-            />
           </View>
-        </ScrollView>
-      </LinearGradient>
+        </View>
+      </Modal>
 
-      {/* Render Modal */}
-      <ModalComponent
-        activeModal={activeModal}
-        closeModal={closeModal}
-        modalAnim={modalAnim}
-        height={height}
-        styles={styles}
-        amount={amount}
-        setAmount={setAmount}
-        walletAddress={walletAddress}
-        setWalletAddress={setWalletAddress}
-        selectedPaymentMethod={selectedPaymentMethod}
-        setSelectedPaymentMethod={setSelectedPaymentMethod}
-        handleTransaction={handleTransaction}
-        isProcessing={isProcessing}
-        rotateAnim={rotateAnim}
-      />
+      {/* Receive Modal */}
+      <Modal visible={receiveModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { width: "98%" }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "stretch" }}>
+              <TouchableOpacity onPress={() => setReceiveModalVisible(false)}>
+                <Icon name="arrow-left" size={24} color="#04523C" />
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { flex: 1, textAlign: "center", marginLeft: -24 }]}>Receive Token</Text>
+            </View>
+            <View style={styles.qrPlaceholder}>
+              <MaterialIcons name="qr-code" size={80} color="#04523C" />
+            </View>
+            <Text style={styles.addressText} onPress={() => copyToClipboard(selectedWallet?.address)}>
+              {selectedWallet?.address}
+            </Text>
+            <TouchableOpacity style={styles.copyButton} onPress={() => copyToClipboard(selectedWallet?.address)}>
+              <Text style={styles.copyButtonText}>Copy Address</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
-      {/* Render Success Modal */}
-      <SuccessModal
-        visible={successModalVisible}
-        message={successMessage}
-        onClose={() => setSuccessModalVisible(false)}
-      />
-      {/* Place BottomNav at the end, outside main content */}
-      <BottomNav />
-    </SafeAreaView>
+      {/* Swap Modal */}
+      <Modal visible={swapModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { width: "98%" }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "stretch" }}>
+              <TouchableOpacity onPress={() => setSwapModalVisible(false)}>
+                <Icon name="arrow-left" size={24} color="#04523C" />
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { flex: 1, textAlign: "center", marginLeft: -24 }]}>Swap Tokens</Text>
+            </View>
+            <TextInput placeholder="From (Select Token)" style={styles.input} />
+            <TextInput placeholder="To (Select Token)" style={styles.input} />
+            <TextInput placeholder="Amount" style={styles.input} keyboardType="decimal-pad" />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.sendButton} onPress={handleSwap}>
+                <Text style={styles.buttonText}>Swap</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Deposit Modal */}
+      <Modal visible={depositModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { width: "98%" }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "stretch" }}>
+              <TouchableOpacity onPress={() => setDepositModalVisible(false)}>
+                <Icon name="arrow-left" size={24} color="#04523C" />
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { flex: 1, textAlign: "center", marginLeft: -24 }]}>Deposit</Text>
+            </View>
+            <Text style={{ color: "#333", marginBottom: 10, textAlign: "center" }}>
+              Deposit crypto or fiat funds to your selected wallet.
+            </Text>
+            <TextInput placeholder="Deposit Amount" style={styles.input} keyboardType="decimal-pad" />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.sendButton} onPress={handleDeposit}>
+                <Text style={styles.buttonText}>Deposit</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Withdraw Modal */}
+      <Modal visible={withdrawModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { width: "98%" }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "stretch" }}>
+              <TouchableOpacity onPress={() => setWithdrawModalVisible(false)}>
+                <Icon name="arrow-left" size={24} color="#04523C" />
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { flex: 1, textAlign: "center", marginLeft: -24 }]}>Withdraw</Text>
+            </View>
+            <Text style={{ color: "#333", marginBottom: 10, textAlign: "center" }}>
+              Withdraw your crypto or fiat funds from your wallet.
+            </Text>
+            <TextInput placeholder="Recipient Address" style={styles.input} />
+            <TextInput placeholder="Amount" style={styles.input} keyboardType="decimal-pad" />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.sendButton} onPress={handleWithdraw}>
+                <Text style={styles.buttonText}>Withdraw</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Bottom Navigation */}
+      <BottomNav active="wallet" />
+    </View>
   );
-};
+}
 
+// ...styles unchanged (keep your existing styles block)...
+
+
+// ---------------- Styles ----------------
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  background: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  eyeButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  eyeIcon: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  eyeText: {
-    fontSize: 20,
-  },
+  headerContainer: { paddingHorizontal: 10, paddingTop: Platform.OS === "android" ? 20 : 40, paddingBottom: 10 },
+  welcomeText: { fontSize: 16, fontWeight: "600", color: "#fff", marginTop: 80 },
+  userName: { fontSize: 15, fontWeight: "bold", color: "#aaa" },
+  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#04523C", justifyContent: "center", alignItems: "center", marginTop: 80 },
+  centerWrapper: { alignItems: "center", marginVertical: 20 },
+  arcContainer: { width: 200, height: 200, borderRadius: 100, justifyContent: "center", alignItems: "center", position: "relative", transform: [{ rotate: "80deg" }] },
+  gradientFullCircle: { width: 200, height: 200, borderRadius: 100 },
+  arcMask: { position: "absolute", width: 100, height: 100, bottom: 0, left: 0, backgroundColor: "#001A13", borderBottomLeftRadius: 100 },
+  innerCircle: { position: "absolute", width: 140, height: 140, backgroundColor: "#001A13", borderRadius: 70, justifyContent: "center", alignItems: "center", transform: [{ rotate: "-80deg" }] },
+  innerCircleContent: { justifyContent: "center", alignItems: "center" },
+  balanceLabel: { fontSize: 12, color: "#9ca3af", marginBottom: 4 },
+  balanceValue: { fontSize: 18, color: "#fff", fontWeight: "bold" },
+  actionRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-around", marginVertical: 15, paddingHorizontal: 10 },
+  actionButton: { alignItems: "center", margin: 8 },
 
-  main: {
-    flex: 1,
-  },
-  walletContainer: {
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 80,
-  },
-  progressSvg: {
-    position: 'absolute',
-  },
-  walletInfo: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  walletTitle: {
-    fontSize: 18,
-    color: '#8E8E93',
-    margintop: 50,
-    fontWeight: '500',
-  },
-  walletAmount: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#2C3E50',
-    marginBottom: 20,
-  },
-  yieldRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+
+  actionIconCircle: {
+    width: 55,
+    height: 55,
+    borderRadius: 28,
+    backgroundColor: "#054536",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 5,
-  },
-  yieldIcon: {
-    fontSize: 16,
-    marginRight: 5,
-  },
-  yieldLabel: {
-    fontSize: 16,
-    color: '#8E8E93',
-    fontWeight: '500',
-  },
-  yieldAmount: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2C3E50',
-  },
-  tabs: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    borderRadius: 25,
-    padding: 5,
-    marginBottom: 20,
-    marginTop: 30,
-    alignSelf: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  tab: {
-    paddingVertical: 8,
-    paddingHorizontal: 22,
-    borderRadius: 20,
-    minWidth: 36,
-    alignItems: 'center',
-    marginHorizontal: 4,
-  },
-  activeTab: {
-    backgroundColor: '#4FACFE',
-    shadowColor: '#4FACFE',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  tabText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#8E8E93',
-    letterSpacing: 1,
-  },
-  activeTabText: {
-    color: '#fff',
-  },
-  indicator: {
-    flexDirection: 'row',
-    marginBottom: 0,
-    marginTop: -15,
-    justifyContent: 'center',
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(142,142,147,0.3)',
-    marginHorizontal: 4,
-  },
-  activeDot: {
-    backgroundColor: '#4FACFE',
-    width: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2C3E50',
-    marginBottom: 20,
-    paddingHorizontal: 20,
-  },
-
-
-
-
-
-  transactionsContainer: {
-    marginTop: 20,
-  },
-  transactionsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 15,
-  },
-  viewAllText: {
-    color: '#4FACFE',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  transactionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    marginBottom: 10,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    marginHorizontal: 20,
-    borderRadius: 15,
-  },
-  transactionIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#4FACFE',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  transactionIconText: {
-    fontSize: 20,
-  },
-  transactionDetails: {
-    flex: 1,
-  },
-  transactionDescription: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2C3E50',
-    marginBottom: 5,
-  },
-  transactionDate: {
-    fontSize: 14,
-    color: '#8E8E93',
-  },
-  transactionAmount: {
-    alignItems: 'flex-end',
-  },
-  transactionAmountText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  statusText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  cardContainer: {
-    marginHorizontal: 15,
-    marginBottom: 30,
-  },
-  card: {
-    borderRadius: 20,
-    padding: 25,
-    minHeight: 220,
-    backgroundColor: '#255f99',
-    shadowColor: '#255f99',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 15,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  bitcoinBackground: {
-    position: 'absolute',
-    top: -10,
-    right: -10,
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  bitcoinIcon: {
-    fontSize: 50,
-    color: 'rgba(255,255,255,0.3)',
-    fontWeight: 'bold',
-  },
-  cardBgDesign: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 0,
-  },
-  bgCircle1: {
-    position: 'absolute',
-    top: -20,
-    right: -20,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  bgCircle2: {
-    position: 'absolute',
-    bottom: -30,
-    left: -30,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  bgCircle3: {
-    position: 'absolute',
-    top: 50,
-    left: 50,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  bgLine1: {
-    position: 'absolute',
-    top: 30,
-    right: 40,
-    width: 60,
-    height: 2,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    transform: [{ rotate: '45deg' }],
-  },
-  bgLine2: {
-    position: 'absolute',
-    bottom: 40,
-    right: 20,
-    width: 40,
-    height: 2,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    transform: [{ rotate: '-30deg' }],
-  },
-  // Premium Design Elements
-  premiumCircle1: {
-    position: 'absolute',
-    top: -30,
-    right: -30,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(21,163,110,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(21,163,110,0.3)',
-  },
-  premiumCircle2: {
-    position: 'absolute',
-    bottom: -40,
-    left: -40,
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  premiumCircle3: {
-    position: 'absolute',
-    top: 60,
-    left: 60,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(21,163,110,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(21,163,110,0.25)',
-  },
-  premiumDiamond: {
-    position: 'absolute',
-    top: 20,
-    right: 80,
-    width: 40,
-    height: 40,
-    backgroundColor: 'rgba(21,163,110,0.2)',
-    transform: [{ rotate: '45deg' }],
-  },
-  premiumLine1: {
-    position: 'absolute',
-    top: 40,
-    right: 30,
-    width: 80,
-    height: 3,
-    backgroundColor: 'rgba(21,163,110,0.3)',
-    transform: [{ rotate: '45deg' }],
-  },
-  premiumLine2: {
-    position: 'absolute',
-    bottom: 60,
-    right: 40,
-    width: 60,
-    height: 2,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    transform: [{ rotate: '-30deg' }],
-  },
-  premiumDot1: {
-    position: 'absolute',
-    top: 100,
-    right: 120,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(21,163,110,0.6)',
-  },
-  premiumDot2: {
-    position: 'absolute',
-    top: 140,
-    right: 100,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.4)',
-  },
-  premiumDot3: {
-    position: 'absolute',
-    top: 160,
-    right: 140,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(21,163,110,0.5)',
-  },
-  premiumBitcoinBg: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(21,163,110,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(21,163,110,0.4)',
-    zIndex: 1,
-    transform: [{ translateX: -40 }, { translateY: -40 }],
-  },
-  premiumBitcoinIcon: {
-    fontSize: 40,
-    color: 'rgba(255,255,255,0.9)',
-    fontWeight: 'bold',
-  },
-  premiumContent: {
-    position: 'relative',
-    zIndex: 2,
-  },
-  premiumHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  premiumTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    letterSpacing: 1,
-  },
-  premiumBadge: {
-    backgroundColor: 'rgba(21,163,110,0.3)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(21,163,110,0.5)',
-  },
-  premiumBadgeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  premiumAmount: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  premiumSubtext: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 15,
-  },
-  premiumAddress: {
-    alignSelf: 'flex-end',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  premiumAddressText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '500',
-    letterSpacing: 0.5,
-  },
-  cardTitle: {
-    fontSize: 14, // was 18
-    fontWeight: '600',
-    color: 'white',
-    marginBottom: 10, // was 15
-  },
-  cardAmount: {
-    fontSize: 20, // was 32
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 3, // was 5
-  },
-  cardSubtext: {
-    fontSize: 10, // was 14
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 8, // was 15
-  },
-  address: {
-    alignSelf: 'flex-end',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-  },
-  addressText: {
-    color: 'white',
-    fontSize: 8, // was 12
-    fontWeight: '500',
-  },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 40,
-    paddingBottom: 10,
-    marginTop: -20,
-  },
-  actionButton: {
-    alignItems: 'center',
-  },
-  actionIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  actionIconText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  actionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2C3E50',
-  },
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    backgroundColor: 'white',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    maxHeight: height * 0.9,
-    minHeight: height * 0.6,
-  },
-  modalContent: {
-    flex: 1,
-    padding: 20,
-  },
-  modalHeader: {
-    alignItems: 'center',
-    marginBottom: 30,
-    position: 'relative',
-  },
-  modalIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 15,
-    elevation: 10,
-  },
-  modalIcon: {
-    fontSize: 32,
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2C3E50',
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: '#8E8E93',
-    textAlign: 'center',
-    marginTop: 5,
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F8F9FA',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    fontSize: 24,
-    color: '#8E8E93',
-  },
-  inputSection: {
-    marginBottom: 25,
-  },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2C3E50',
-    marginBottom: 10,
-  },
-  amountInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    borderRadius: 15,
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderWidth: 2,
-    borderColor: '#E9ECEF',
-  },
-  amountInput: {
-    flex: 1,
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2C3E50',
-  },
-  currencyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#8E8E93',
-  },
-  progressBar: {
-    height: 3,
-    borderRadius: 2,
-    marginTop: 5,
-  },
-  addressInput: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 15,
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    fontSize: 16,
-    color: '#2C3E50',
-    borderWidth: 2,
-    borderColor: '#E9ECEF',
-  },
-  addressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  qrButton: {
-    backgroundColor: '#4FACFE',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-  },
-  qrButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  qrCodeContainer: {
-    marginTop: 15,
-    alignItems: 'center',
-  },
-  qrCode: {
-    width: 150,
-    height: 150,
-    backgroundColor: 'white',
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E9ECEF',
-  },
-  qrCodeText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2C3E50',
-    marginBottom: 5,
-  },
-  qrCodeAddress: {
-    fontSize: 12,
-    color: '#8E8E93',
-  },
-  scanLine: {
-    position: 'absolute',
-    width: '100%',
-    height: 2,
-    backgroundColor: '#4FACFE',
-    top: 0,
-  },
-  quickAmountSection: {
-    marginBottom: 25,
-  },
-  quickAmountButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  quickAmountButton: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    paddingVertical: 12,
-    marginHorizontal: 5,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E9ECEF',
-  },
-  quickAmountText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2C3E50',
-  },
-  paymentSection: {
-    marginBottom: 25,
-  },
-  paymentMethods: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  paymentMethod: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 15,
-    paddingVertical: 20,
-    paddingHorizontal: 10,
-    marginHorizontal: 5,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E9ECEF',
-  },
-  selectedPaymentMethod: {
-    backgroundColor: '#E3F2FD',
-    borderColor: '#4FACFE',
-  },
-  paymentMethodIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  paymentMethodLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2C3E50',
-    textAlign: 'center',
-  },
-  paymentMethodFee: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginTop: 5,
-  },
-  transactionDetails: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 15,
-    padding: 20,
-    marginBottom: 30,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  detailLabel: {
-    fontSize: 16,
-    color: '#8E8E93',
-  },
-  detailValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2C3E50',
-  },
-  totalRow: {
-    borderTopWidth: 1,
-    borderTopColor: '#E9ECEF',
-    paddingTop: 10,
-    marginTop: 10,
-  },
-  totalLabel: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2C3E50',
-  },
-  totalValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#4FACFE',
-  },
-  actionButtonModal: {
-    borderRadius: 15,
-    overflow: 'hidden',
-    marginBottom: 30,
-  },
-  actionButtonGradient: {
-    paddingVertical: 18,
-    alignItems: 'center',
-    borderRadius: 15,
-    flexDirection: 'row',
-    justifyContent: 'center',
   },
   actionButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
   },
-  processingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+  tabBar: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginHorizontal: 20,
+    marginTop: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.2)",
   },
-  processingSpinner: {
-    marginRight: 10,
-  },
-  processingIcon: {
-    fontSize: 22,
-    color: 'white',
-  },
-  processingText: {
-    fontSize: 16,
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  circleWrapper: {
-    width: 280,
-    height: 280,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  walletInfoOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: 280,
-    height: 280,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  walletTitle: {
-    fontSize: 14,
-    color: '#8E8E93',
-    marginBottom: 8,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  walletAmount: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#2C3E50',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  yieldRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 2,
-    justifyContent: 'center',
-  },
-  yieldIcon: {
-    fontSize: 16,
-    marginRight: 5,
-  },
-  yieldLabel: {
-    fontSize: 16,
-    color: '#8E8E93',
-    fontWeight: '500',
-  },
-  yieldAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2C3E50',
-    marginTop: 4,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  tabs: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    borderRadius: 20,
-    padding: 3,
-    marginTop: 25,
-    alignSelf: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-    width: 140,
-    justifyContent: 'center',
-  },
-  tab: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 15,
-    minWidth: 28,
-    alignItems: 'center',
-    marginHorizontal: 2,
-  },
-  activeTab: {
-    backgroundColor: '#4FACFE',
-    shadowColor: '#4FACFE',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    elevation: 6,
+  tabButton: {
+    alignItems: "center",
+    paddingVertical: 10,
+    flex: 1,
   },
   tabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#8E8E93',
-    letterSpacing: 1,
+    color: "#9ca3af",
+    fontSize: 14,
+    fontWeight: "600",
   },
   activeTabText: {
-    color: '#fff',
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  tabUnderline: {
+    height: 3,
+    backgroundColor: "#04523C",
+    width: "50%",
+  },
+  section: {
+    marginHorizontal: 15,
+    marginVertical: 10,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 12,
+    padding: 15,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#fff",
+  },
+  addButton: {
+    backgroundColor: "#04523C",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    color: "#fff",
+    fontSize: 12,
+    overflow: "hidden",
+  },
+  addTokenForm: {
+    backgroundColor: "rgba(255,255,255,0.1)",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  input: {
+    backgroundColor: "#fff",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+    fontSize: 14,
+  },
+  tokenRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.1)",
+  },
+  tokenIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#04523C",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  tokenName: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  tokenSymbol: {
+    color: "#9ca3af",
+    fontSize: 12,
+  },
+  tokenValues: {
+    alignItems: "flex-end",
+  },
+  tokenPrice: {
+    color: "#fff",
+    fontSize: 14,
+  },
+  tokenAmount: {
+    color: "#9ca3af",
+    fontSize: 12,
+  },
+  tokenTotal: {
+    color: "#10b981",
+    fontWeight: "bold",
+  },
+  historyItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.1)",
+  },
+  historyIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  historyToken: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  historyDate: {
+    color: "#9ca3af",
+    fontSize: 12,
+  },
+  historyStatus: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  txId: {
+    color: "#60a5fa",
+    fontSize: 11,
+  },
+  walletItem: {
+    padding: 12,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 8,
+    marginBottom: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  selectedWallet: {
+    borderColor: "#04523C",
+    borderWidth: 1,
+  },
+  walletName: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  walletAddress: {
+    color: "#9ca3af",
+    fontSize: 12,
+    maxWidth: 180,
+  },
+  walletBalance: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  actionButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+  actionBtn: {
+    flexDirection: "row",
+    backgroundColor: "#04523C",
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    flex: 1,
+    marginHorizontal: 5,
+    justifyContent: "center",
+  },
+  actionBtnText: {
+    color: "#fff",
+    marginLeft: 5,
+    fontSize: 12,
+  },
+  settingRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.1)",
+  },
+  settingLabel: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  settingDesc: {
+    color: "#9ca3af",
+    fontSize: 12,
+  },
+  toggle: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+  },
+  toggleTrack: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#6b7280",
+    backgroundColor: "#374151",
+    justifyContent: "center",
+  },
+  toggleActive: {
+    backgroundColor: "#04523C",
+    borderColor: "#04523C",
+  },
+  toggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    margin: 2,
+  },
+  backupButton: {
+    marginTop: 15,
+    flexDirection: "row",
+    backgroundColor: "#dc2626",
+    padding: 12,
+    borderRadius: 8,
+    justifyContent: "center",
+  },
+  backupText: {
+    color: "#fff",
+    fontWeight: "bold",
+    marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 16,
+    alignItems: "center",
+    width: "90%",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 15,
+    color: "#000",
+  },
+  modalButtons: {
+    flexDirection: "row",
+    marginTop: 20,
+    width: "100%",
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: "#d1d5db",
+    padding: 12,
+    borderRadius: 8,
+    marginRight: 10,
+    alignItems: "center",
+  },
+  sendButton: {
+    flex: 1,
+    backgroundColor: "#04523C",
+    padding: 12,
+    borderRadius: 8,
+    marginLeft: 10,
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  addressText: {
+    marginVertical: 10,
+    fontSize: 12,
+    color: "#000",
+    textAlign: "center",
+    maxWidth: "100%",
+  },
+  copyButton: {
+    backgroundColor: "#3b82f6",
+    padding: 10,
+    borderRadius: 8,
+    marginVertical: 10,
+    width: "80%",
+  },
+  copyButtonText: {
+    color: "#fff",
+    textAlign: "center",
+  },
+  closeButton: {
+    marginTop: 10,
+    padding: 10,
+  },
+  closeText: {
+    color: "#6b7280",
+  },
+  qrPlaceholder: {
+    width: 120,
+    height: 120,
+    backgroundColor: "#f0fdf4",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 12,
+    marginVertical: 15,
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
   },
 });
 
-export default WalletInterface;

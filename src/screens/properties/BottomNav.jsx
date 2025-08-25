@@ -4,30 +4,31 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useNavigationState } from '@react-navigation/native';
 
-
-
 const navItems = [
   { id: 'home', icon: 'home', label: 'Home', screen: 'Home' },
-  { id: 'store', icon: 'store', label: 'Marketplace', screen: 'Marketplace' },
+  { id: 'store', icon: 'store', label: 'Market', screen: 'Marketplace' },
   { id: 'wallet', icon: 'account-balance-wallet', label: 'Wallet', screen: 'WalletInterface' },
+  { id: 'portfolio', icon: 'insert-chart', label: 'Portfolio', screen: 'PortfolioScreen' },
   { id: 'profile', icon: 'person', label: 'Profile', screen: 'Profile' },
 ];
 
 const BottomNav = () => {
   const navigation = useNavigation();
-  
-  // Get current route name from navigation state
-  const currentRouteName = useNavigationState(state => {
-    if (state && state.routes && state.index !== undefined) {
-      return state.routes[state.index].name;
-    }
-    return 'Marketplace'; // Default fallback
-  });
-  
-  // Determine active tab based on current route
+
+ const currentRouteName = useNavigationState(state => {
+  if (
+    state &&
+    Array.isArray(state.routes) &&
+    typeof state.index === 'number' &&
+    state.routes[state.index]
+  ) {
+    return state.routes[state.index].name || 'Marketplace';
+  }
+  return 'Marketplace';
+});
+
   const activeTab = navItems.find(item => item.screen === currentRouteName)?.id || 'store';
 
-  // Animation state for each tab
   const scaleAnims = React.useRef(
     navItems.reduce((acc, item) => {
       acc[item.id] = new Animated.Value(1);
@@ -36,27 +37,35 @@ const BottomNav = () => {
   ).current;
 
   const handleTabPress = (tabId, screenName) => {
-    if (activeTab === tabId) return; // Already active, do nothing
+    if (activeTab === tabId) return;
 
-    // Animate the pressed tab
     Animated.sequence([
       Animated.timing(scaleAnims[tabId], { toValue: 0.95, duration: 100, useNativeDriver: true }),
       Animated.timing(scaleAnims[tabId], { toValue: 1, duration: 100, useNativeDriver: true }),
     ]).start();
 
-    // Navigate to the corresponding screen
     navigation.navigate(screenName);
   };
+
+  // Static dark theme styles and colors (no toggle)
+  const gradientColors = ['#012419ff', '#012419ff', '#012419ff']; // dark background gradient
+  const navBg = 'transparent';
+  const iconActiveBg = 'rgba(0,255,102,0.18)'; // neon green glass behind active icon
+  const iconInactiveBg = 'rgba(255,255,255,0.07)'; // subtle glass behind inactive icons
+  const iconActiveColor = '#fff'; // neon green for active icon
+  const iconInactiveColor = '#aaa'; // muted gray inactive icon color
+  const textActive = '#fff'; // bright text active
+  const textInactive = '#7ad1a5'; // soft green text inactive
 
   return (
     <View style={styles.bottomNavContainer}>
       <LinearGradient
-        colors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.98)']}
+        colors={gradientColors}
         style={styles.bottomNavGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
-        <View style={styles.bottomNav}>
+        <View style={[styles.bottomNav, { backgroundColor: navBg }]}>
           {navItems.map((item) => {
             const isActive = activeTab === item.id;
             return (
@@ -64,7 +73,7 @@ const BottomNav = () => {
                 key={item.id}
                 style={[
                   styles.navItemWrapper,
-                  { transform: [{ scale: scaleAnims[item.id] }] }
+                  { transform: [{ scale: scaleAnims[item.id] }] },
                 ]}
               >
                 <TouchableOpacity
@@ -75,22 +84,29 @@ const BottomNav = () => {
                   accessibilityState={{ selected: isActive }}
                   accessibilityLabel={item.label}
                 >
-                  {isActive && <View style={styles.activeYellowLine} />}
                   <View style={styles.navContent}>
-                    <View style={[
-                      styles.iconContainer,
-                      isActive && styles.activeIconContainer
-                    ]}>
+                    <View
+                      style={[
+                        styles.iconContainer,
+                        {
+                          backgroundColor: isActive ? iconActiveBg : iconInactiveBg,
+                        },
+                        isActive && styles.activeIconContainer,
+                      ]}
+                    >
                       <Icon
                         name={item.icon}
                         size={18}
-                        color={isActive ? "#fff" : "#999"}
+                        color={isActive ? iconActiveColor : iconInactiveColor}
                       />
                     </View>
-                    <Text style={[
-                      styles.navText,
-                      isActive && styles.navTextActive
-                    ]}>
+                    <Text
+                      style={[
+                        styles.navText,
+                        { color: isActive ? textActive : textActive },
+                        isActive && styles.navTextActive,
+                      ]}
+                    >
                       {item.label}
                     </Text>
                   </View>
@@ -113,13 +129,8 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 0,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 12,
     backgroundColor: 'transparent',
-    zIndex: 9999, // Ensure always on top
+    zIndex: 9999,
   },
   bottomNavGradient: {
     borderRadius: 0,
@@ -128,18 +139,18 @@ const styles = StyleSheet.create({
   },
   bottomNav: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 0,
     paddingVertical: 10,
     paddingHorizontal: 0,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
     width: '100%',
+    backgroundColor: '#001A13', // Dark background
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(255,255,255,0.08)', // Very subtle top border
   },
   navItemWrapper: {
-    width: 80,
+    flex: 1,
     alignItems: 'center',
   },
   navItem: {
@@ -149,18 +160,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     position: 'relative',
     overflow: 'hidden',
-    width: 80,
-  },
-  activeYellowLine: {
-    position: 'absolute',
-    top: 0,
-    left: 18,
-    right: 18,
-    height: 4,
-    borderTopLeftRadius: 2,
-    borderTopRightRadius: 2,
-    backgroundColor: '#15a36e',
-    zIndex: 2,
+    width: '100%',
   },
   navContent: {
     alignItems: 'center',
@@ -170,27 +170,27 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: 'rgba(37, 95, 153, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
+    backgroundColor: 'rgba(255,255,255,0.07)',
   },
   activeIconContainer: {
-    backgroundColor: 'rgba(37, 95, 153, 0.4)',
-    shadowColor: '#fff',
-    shadowOffset: { width: 0, height: 2 },
+    backgroundColor: 'rgba(0,255,153,0.15)', // Soft neon green glass
+    shadowColor: '#00FF9D',
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
-    elevation: 4,
+    elevation: 2,
   },
   navText: {
-    color: '#999',
     fontSize: 9,
     fontWeight: '600',
     letterSpacing: 0.3,
+    color: '#fff', // Soft green for inactive text
   },
   navTextActive: {
-    color: '#000',
+    color: '#fff', // White for active text
     fontWeight: '700',
     textShadowColor: 'rgba(0, 0, 0, 0.1)',
     textShadowOffset: { width: 0, height: 1 },
