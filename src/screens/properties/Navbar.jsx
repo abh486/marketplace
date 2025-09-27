@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,12 +9,21 @@ import {
   Animated,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { UserProfileContext } from '../Context/UserProfileContext';
+import { useTheme } from '../../Theme/ThemeContext'; // ✅ ADDED — adjust path if needed
 
 const HEADER_HEIGHT = 80;
 
 const Navbar = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
+
+  // Theme Context
+  const { theme, isDarkMode, toggleTheme } = useTheme(); // ✅ Get theme & toggle
+
+  // Get KYC status from context
+  const { profile } = useContext(UserProfileContext);
+  const kycVerified = profile?.kycVerified || false;
 
   const openModal = () => {
     setModalVisible(true);
@@ -33,17 +42,54 @@ const Navbar = () => {
     }).start(() => setModalVisible(false));
   };
 
-  return (
-    <View style={styles.headerContainer}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+  const handleKYC = () => {
+    closeModal();
+    if (!kycVerified) {
+      alert('Please verify your KYC.');
+    } else {
+      alert('KYC Verified');
+    }
+  };
 
-      {/* Right side: Hamburger Menu Only */}
+  const handleHelp = () => {
+    closeModal();
+    alert('Navigate to Help Centre');
+  };
+
+  const handleTerms = () => {
+    closeModal();
+    alert('Navigate to Terms and Privacy');
+  };
+
+  const handleLogout = () => {
+    closeModal();
+    alert('Logging out...');
+  };
+
+  const handleToggleTheme = () => {
+    closeModal();
+    toggleTheme(); // ✅ Toggle between light/dark
+  };
+
+  return (
+    <View style={[styles.headerContainer, { backgroundColor: theme.background }]}>
+      <StatusBar
+        barStyle={isDarkMode ? "light-content" : "dark-content"}
+        backgroundColor="transparent"
+        translucent
+      />
+
+      {/* Hamburger Menu */}
       <View style={styles.rightButtonsContainer}>
-        <TouchableOpacity style={styles.iconButton} onPress={openModal}>
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={openModal}
+          accessibilityLabel="Open Menu"
+        >
           <View style={styles.hamburgerIcon}>
-            <View style={styles.hamburgerLine} />
-            <View style={styles.hamburgerLine} />
-            <View style={styles.hamburgerLine} />
+            <View style={[styles.hamburgerLine, { backgroundColor: theme.text }]} />
+            <View style={[styles.hamburgerLine, { backgroundColor: theme.text }]} />
+            <View style={[styles.hamburgerLine, { backgroundColor: theme.text }]} />
           </View>
         </TouchableOpacity>
       </View>
@@ -69,30 +115,58 @@ const Navbar = () => {
                   {
                     translateY: fadeAnim.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [-50, 0],
+                      outputRange: [-30, 0],
                     }),
                   },
                 ],
+                backgroundColor: theme.card,
               },
             ]}
           >
-            <TouchableOpacity
-              activeOpacity={1}
-              onPress={(e) => e.stopPropagation()}
-            >
-              <View style={styles.modalHeader}>
-                <View style={styles.headerOptions}>
-                  <TouchableOpacity style={styles.headerOption} onPress={() => { /* handle profile */ }}>
-                    <Icon name="person-outline" size={20} color="#255f99" />
-                    <Text style={styles.headerOptionText}>Profile</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.headerOption} onPress={() => { /* handle investment */ }}>
-                    <Icon name="trending-up-outline" size={20} color="#255f99" />
-                    <Text style={styles.headerOptionText}>Investment</Text>
-                  </TouchableOpacity>
-                </View>
-                <TouchableOpacity onPress={closeModal}>
-                  <Icon name="close" size={24} color="#000" />
+            <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+              {/* Close Button */}
+              <TouchableOpacity
+                onPress={closeModal}
+                style={styles.closeButton}
+                accessibilityLabel="Close Menu"
+              >
+                <Icon name="close" size={25} color={theme.textSecondary} />
+              </TouchableOpacity>
+
+              {/* Menu Items */}
+              <View style={styles.menuItemsContainer}>
+                <TouchableOpacity style={styles.menuItem} onPress={handleKYC}>
+                  <Icon name="document-text-outline" size={24} color={theme.textSecondary} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>
+                    {kycVerified ? 'KYC Verified' : 'Verify KYC'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.menuItem} onPress={handleHelp}>
+                  <Icon name="help-circle-outline" size={24} color={theme.textSecondary} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Help Centre</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.menuItem} onPress={handleTerms}>
+                  <Icon name="reader-outline" size={24} color={theme.textSecondary} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Terms & Privacy</Text>
+                </TouchableOpacity>
+
+                {/* ✅ THEME TOGGLE OPTION */}
+                <TouchableOpacity style={styles.menuItem} onPress={handleToggleTheme}>
+                  <Icon
+                    name={isDarkMode ? "sunny-outline" : "moon-outline"}
+                    size={24}
+                    color={theme.textSecondary}
+                  />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>
+                    {isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
+                  <Icon name="log-out-outline" size={24} color={theme.textSecondary} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Logout</Text>
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
@@ -114,10 +188,8 @@ const styles = StyleSheet.create({
     right: 0,
     height: HEADER_HEIGHT,
     zIndex: 1000,
-    backgroundColor: '#012419ff',
     paddingHorizontal: 20,
     paddingTop: 30,
-   
   },
   rightButtonsContainer: {
     flexDirection: 'row',
@@ -139,7 +211,6 @@ const styles = StyleSheet.create({
   hamburgerLine: {
     width: 20,
     height: 2,
-    backgroundColor: '#ffffffff',
     borderRadius: 1,
   },
   modalOverlay: {
@@ -147,45 +218,35 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,16,32,0.83)',
     justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingTop: HEADER_HEIGHT,
+    paddingTop: HEADER_HEIGHT - 10,
   },
   modalContent: {
-    backgroundColor: '#1d3125',
     width: '90%',
-    maxHeight: 400,
+    maxHeight: 320, // Increased to fit new option
     borderRadius: 20,
-    shadowColor: '#00ff66',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.17,
-    shadowRadius: 10,
-    elevation: 10,
-    borderWidth: 1.1,
-    borderColor: '#00ff6633',
+    paddingVertical: 12,
+    paddingHorizontal: 0,
   },
-  modalHeader: {
+  closeButton: {
+    position: 'absolute',
+    top: 5,
+    right: 16,
+    padding: 3,
+    zIndex: 20,
+  },
+  menuItemsContainer: {
+    marginTop: 0,
+  },
+  menuItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 12,
     paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#222',
   },
-  headerOptions: {
-    flexDirection: 'row',
-    flex: 1,
-    justifyContent: 'space-around',
-  },
-  headerOption: {
-    alignItems: 'center',
-    paddingHorizontal: 10,
-  },
-  headerOptionText: {
-    fontSize: 12,
+  menuItemText: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#00ff66',
-    marginTop: 4,
-    letterSpacing: 0.5,
+    marginLeft: 14,
   },
 });
 

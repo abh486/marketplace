@@ -1,264 +1,368 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
   Image,
+  Dimensions,
+  ActivityIndicator
 } from "react-native";
 import LinearGradient from "react-native-linear-gradient";
-import Icon from "react-native-vector-icons/Feather";
-import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { LineChart } from "react-native-chart-kit";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
+import { UserProfileContext } from "../Context/UserProfileContext";
+import { useWallet } from "../Context/WalletContext";
+import { useTheme } from "../../Theme/ThemeContext"; // ✅ ADDED
 
 import Navbar from "../properties/Navbar";
 import BottomNav from "../properties/BottomNav";
 
 const W = Dimensions.get("window").width;
 
+const API_KEY = "740b5229de0741969e46c53db4bb611c";
+const BASE_CURRENCY = "INR";
+
+const chartLabelsByRange = {
+  Weekly: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+  Monthly: [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ],
+  Yearly: ["2021", "2022", "2023", "2024", "2025"],
+};
+
+const chartDataByRange = {
+  Weekly: [0.0,0.15,0.4,0.65,0.85,1.0,0.75,1.0,1.25,1.45,1.2,1.3,1.55,1.75,1.4,1.2,1.3,1.55,1.75,1.4,1.2,1.35,
+    1.5,1.8,1.7,1.9,2.1,2.2,2.5,2.4,2.6,2.8,2.5,2.65,2.8,2.8,2.5,2.65,2.8,2.95,3.2,3.3,3.1,3.4,3.6,3.4,3.5,3.8,
+    3.7,3.6,3.4,3.1,2.65,2.5,2.6,2.4,2.5,2.2,2.1,1.9,1.7,2.1,2.2,2.5,2.4,2.6,2.8,2.5,2.65,2.8],
+  Monthly: [0.8, 0, 0.5, 0.2, 0.6, -0.5, 1.5, -0.10, 0.8],
+  Yearly: [20, 22, 21, 23, -10],
+};
+
 export default function PortfolioScreen() {
-  const [selectedRange, setSelectedRange] = useState("1M");
+  const { isDarkMode } = useTheme(); // ✅ ADDED
+  const [selectedRange, setSelectedRange] = useState("Weekly");
   const [filter, setFilter] = useState("All");
+  const { profile } = useContext(UserProfileContext);
+  const currency = profile?.currency || "USD";
 
-  // Mock Portfolio Data
-  const portfolioValue = 84230;
-  const gainPercent = 12.7;
+  // ✅ Get wallet data
+  const { assets, balance, history } = useWallet();
 
-  const assets = [
-    {
-      id: 1,
-      name: "Dubai Tower Residence",
-      type: "Real Estate",
-      shares: 10,
-      currentValue: 65000,
-      roi: 9.5,
-      icon: require("../../assets/image/apar.jpg"), // Replace with real image
-    },
-    {
-      id: 2,
-      name: "Gold Bullion Token",
-      type: "Commodities",
-      shares: "2g",
-      currentValue: 12000,
-      roi: 5.2,
-      roiColor: "#FFD700",
-      icon: require("../../assets/image/apar.jpg"),
-    },
-    {
-      id: 3,
-      name: "Modern Art Collection",
-      type: "Fine Art",
-      shares: 15,
-      currentValue: 7230,
-      roi: 18.3,
-      icon: require("../../assets/image/apar.jpg"),
-    },
-  ];
+  // State to store fetched exchange rates
+  const [exchangeRates, setExchangeRates] = useState({});
+  const [isRatesLoading, setIsRatesLoading] = useState(true);
 
-  const recentActivity = [
-    { id: 1, action: "Bought", asset: "Gold Bullion Token", amount: "1g", time: "2h ago" },
-    { id: 2, action: "Dividend Received", asset: "Dubai Tower Residence", amount: "$240", time: "1d ago" },
-    { id: 3, action: "Sold", asset: "Tech Startup Token", amount: "-$1,200", time: "3d ago" },
-  ];
+  useEffect(() => {
+    const fetchRates = async () => {
+      setIsRatesLoading(true);
+      try {
+        const response = await fetch(`https://api.currencyfreaks.com/v2.0/rates/latest?apikey=${API_KEY}`);
+        const data = await response.json();
+        setExchangeRates(data.rates || {});
+      } catch (error) {
+        console.error("Failed to fetch exchange rates", error);
+      }
+      setIsRatesLoading(false);
+    };
+    fetchRates();
+  }, []);
 
-  // Chart Data (7 days to 1 year based on range)
-  const getChartData = () => {
-    switch (selectedRange) {
-      case "D":
-        return [2, 2.1, 2.05, 2.2, 2.15, 2.3, 2.4];
-      case "1W":
-        return [2, 2.1, 2.05, 2.2, 2.15, 2.3, 2.4];
-      case "1M":
-        return [2, 2.1, 2.3, 2.2, 2.4, 2.6, 2.8, 3.0, 3.1, 3.3, 3.2, 3.5, 3.7, 3.8, 3.9, 4.1, 4.3, 4.2, 4.5, 4.7, 4.8, 5.0, 5.1, 5.3, 5.5, 5.7, 5.8, 6.0, 6.1, 6.3, 6.5];
-      case "YTD":
-        return Array(12).fill(0).map((_, i) => 2 + Math.sin(i * 0.5) * 0.3 + i * 0.3);
-      case "1Y":
-        return Array(12).fill(0).map((_, i) => 2 + Math.sin(i * 0.7) * 0.5 + i * 0.4);
-      default:
-        return [2, 3.2, 3.25, 5.8, 5.65, 6.0, 4.95, 5.5, 6.3, 6.28, 6.6, 6.55, 6.8, 7];
+  // Convert amount from base currency (INR) to user currency with Intl formatting
+  const formatAmountByCurrency = (amount, currencyCode, locale = "en-US") => {
+    try {
+      let rate = 1;
+      if (exchangeRates && exchangeRates[currencyCode] && exchangeRates[BASE_CURRENCY]) {
+        rate = parseFloat(exchangeRates[currencyCode]) / parseFloat(exchangeRates[BASE_CURRENCY]);
+      } else if (currencyCode === BASE_CURRENCY) {
+        rate = 1;
+      }
+      const convertedAmount = amount * rate;
+      return new Intl.NumberFormat(locale, {
+        style: "currency",
+        currency: currencyCode,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(convertedAmount);
+    } catch {
+      return `${currencyCode} ${amount.toFixed(2)}`;
     }
   };
 
-  const data = getChartData();
+  const labels = chartLabelsByRange[selectedRange] || chartLabelsByRange.Weekly;
+  const dataPoints = chartDataByRange[selectedRange] || chartDataByRange.Weekly;
 
-  const filteredAssets = filter === "All" ? assets : assets.filter((a) => a.type === filter);
+  // ✅ Portfolio value is balance + assets total
+  const assetsValueINR = assets.reduce(
+    (sum, a) => sum + (a.tokenPrice || 0) * (a.quantity || 0),
+    0
+  );
+  const portfolioValueINR = balance + assetsValueINR;
+  const gainPercent = 12.7; // keep static for now
+
+  // ✅ Apply filter to assets
+  const filteredAssets =
+    filter === "All" ? assets : assets.filter((a) => a.type === filter);
+
+  const upcomingPayouts = [
+    { id: 1, asset: "Dubai Tower Residence", amountUSD: 240, date: "Sep 30" },
+    { id: 2, asset: "Gold Bullion Token", amountUSD: 50, date: "Oct 10" },
+  ];
+
+  if (isRatesLoading) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: isDarkMode ? "#001A13" : "#FFFFFF" }]}>
+        <ActivityIndicator size="large" color={isDarkMode ? "#00DB84" : "#02af6a"} />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Background */}
-      <LinearGradient
-        colors={["#0f2027", "#203a43", "#2c5364"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
+      {/* Background Gradient — ONLY in Dark Mode */}
+      {isDarkMode && (
+        <>
+          <LinearGradient
+            colors={["#001A13", "#003B28", "#017148ff"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <LinearGradient
+            colors={["rgba(255,255,255,0.02)", "rgba(0,0,0,0.6)"]}
+            style={StyleSheet.absoluteFillObject}
+          />
+        </>
+      )}
 
       <Navbar />
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 90, flexGrow: 1 }}
-      >
-        {/* Header */}
-        <View style={styles.headerContainer}>
-          <Text style={styles.welcomeText}>Your Portfolio</Text>
-          <Text style={styles.subText}>All your investments in one place</Text>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 90, flexGrow: 1 }}>
+        <View style={styles.balanceHeaderRow}>
+          <Text style={[styles.balanceLabel, { color: isDarkMode ? "#aaa" : "#666" }]}>Your Portfolio</Text>
+          <View style={styles.performanceContainer}>
+            <Text style={[styles.performanceLabel, { color: isDarkMode ? "#fff" : "#000" }]}>1D +0.02</Text>
+            <View style={[styles.percentageBox, { backgroundColor: isDarkMode ? "#07392dff" : "#FAFAFA" }]}>
+              <Text style={[styles.percentageValue, { color: isDarkMode ? "#42e7a2" : "#02af6a" }]}>+0.02%</Text>
+            </View>
+          </View>
         </View>
 
-        {/* Total Portfolio Value */}
-        <View style={styles.card}>
-          <Text style={styles.label}>Total Portfolio Value</Text>
-          <Text style={styles.value}>${portfolioValue.toLocaleString()}</Text>
-          <Text style={[styles.gain, { color: gainPercent > 0 ? "#00e676" : "#ff5252" }]}>
-            {gainPercent > 0 ? "↑" : "↓"} {Math.abs(gainPercent)}% this month
-          </Text>
-        </View>
-
-        {/* Chart */}
-        <View style={styles.chartWrapper}>
-          <LineChart
-            data={{
-              labels: data.map((_, i) => `Day ${i + 1}`),
-              datasets: [
-                {
-                  data: data,
-                  color: () => "#00FF66",
-                  strokeWidth: 2,
-                },
-              ],
-            }}
-            width={W}
-            height={180}
-            withDots={false}
-            withInnerLines={false}
-            withOuterLines={false}
-            withVerticalLabels={false}
-            withHorizontalLabels={false}
-            segments={4}
-            transparent={true}
-            bezier
-            fromZero
-            chartConfig={{
-              backgroundColor: "#0f2027",
-              backgroundGradientFrom: "#0f2027",
-              backgroundGradientTo: "#0f2027",
-              fillShadowGradientFrom: "#00FF66",
-              fillShadowGradientFromOpacity: 0.12,
-              fillShadowGradientTo: "#0f2027",
-              fillShadowGradientToOpacity: 0,
-              color: () => "#00FF66",
-              strokeWidth: 2,
-              propsForBackgroundLines: { stroke: "rgba(255,255,255,0.05)" },
-              propsForLabels: { fontSize: 0 },
-            }}
-            style={{ marginLeft: 0, paddingRight: 0 }}
-          />
+        <View style={styles.balanceContentRow}>
+          <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 10 }}>
+            <Text style={[styles.balanceValue, { color: isDarkMode ? "#fff" : "#000" }]}>
+              {formatAmountByCurrency(portfolioValueINR, currency)}
+            </Text>
+            <Text style={[styles.balanceChange, { marginLeft: 8, color: isDarkMode ? "#42e7a2" : "#02af6a" }]}>
+              ↑ {gainPercent}%
+            </Text>
+          </View>
         </View>
 
         {/* Time Range Tabs */}
         <View style={styles.rangeTabs}>
-          {["D", "1W", "1M", "YTD", "1Y"].map((range) => (
+          {["Weekly", "Monthly", "Yearly"].map((range) => (
             <TouchableOpacity
               key={range}
               style={[
                 styles.rangeButton,
-                selectedRange === range && styles.activeRangeButton,
+                { backgroundColor: isDarkMode ? "#07392dff" : "#FAFAFA" },
+                selectedRange === range && { backgroundColor: isDarkMode ? "#60b58c93" : "#e6fff5" },
               ]}
               onPress={() => setSelectedRange(range)}
             >
-              <Text
-                style={[
-                  styles.rangeText,
-                  selectedRange === range && styles.activeRangeText,
-                ]}
-              >
+              <Text style={[
+                styles.rangeText,
+                { color: isDarkMode ? "#aaa" : "#666" },
+                selectedRange === range && { color: isDarkMode ? "#000" : "#02af6a", fontWeight: "bold" },
+              ]}>
                 {range}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Filters */}
-        <View style={styles.filterRow}>
-          {["All", "Real Estate", "Commodities", "Fine Art"].map((cat) => (
-            <TouchableOpacity
-              key={cat}
-              style={[
-                styles.filterButton,
-                filter === cat && styles.activeFilter,
-              ]}
-              onPress={() => setFilter(cat)}
-            >
-              <Text
+        {/* Chart Section */}
+        <View style={{ position: "relative", marginHorizontal: 5, marginBottom: 16 }}>
+          <LineChart
+            data={{
+              labels,
+              datasets: [{ data: dataPoints, color: () => isDarkMode ? "#00bf73ff" : "#02af6a", strokeWidth: 1.5 }],
+            }}
+            width={W + 50}
+            height={200}
+            withDots={false}
+            withInnerLines={false}
+            withOuterLines={false}
+            withVerticalLabels={false}
+            withHorizontalLabels={false}
+            bezier
+            chartConfig={{
+              backgroundGradientFrom: "transparent",
+              backgroundGradientTo: "transparent",
+              fillShadowGradient: "transparent",
+              fillShadowGradientOpacity: 0,
+              decimalPlaces: 2,
+              color: () => isDarkMode ? "#00bf73ff" : "#02af6a",
+              strokeWidth: 1.5,
+              propsForBackgroundLines: { stroke: "transparent" },
+              propsForLabels: { fontSize: 12, fill: isDarkMode ? "#00bf73ff" : "#02af6a" },
+              backgroundGradientFromOpacity: 0,
+              backgroundGradientToOpacity: 0,
+            }}
+            style={{
+              borderRadius: 8,
+              backgroundColor: "transparent",
+              marginLeft: -60,
+              marginBottom: -30,
+            }}
+            segments={4}
+          />
+          <View style={styles.dayLabelsContainer}>
+            {labels.map((label, index) => (
+              <TouchableOpacity
+                key={index}
                 style={[
-                  styles.filterText,
-                  filter === cat ? styles.activeFilterText : { color: "#aaa" },
+                  styles.dayLabelButton,
+                  { backgroundColor: isDarkMode ? "#07392dff" : "#FAFAFA" },
+                  index === labels.length - 1 && { backgroundColor: isDarkMode ? "#60b58c93" : "#e6fff5" },
                 ]}
               >
+                <Text style={[styles.dayLabelText, { color: isDarkMode ? "#000" : "#02af6a" }]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Filters */}
+        <View style={styles.filterRow}>
+          {["All", "Real Estate", "Commodities", "Fine Art", "credit"].map((cat) => (
+            <TouchableOpacity
+              key={cat}
+              style={styles.filterButton}
+              onPress={() => setFilter(cat)}
+            >
+              <Text style={[
+                styles.filterText,
+                { color: filter === cat ? (isDarkMode ? "#60b58c93" : "#02af6a") : (isDarkMode ? "#ccc" : "#999") },
+                filter === cat && { fontWeight: "bold", textDecorationLine: "underline" },
+              ]}>
                 {cat}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Asset List */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Owned Assets</Text>
-          {filteredAssets.map((asset) => (
-            <TouchableOpacity
-              key={asset.id}
-              style={styles.assetItem}
-              onPress={() => console.log(`View details for ${asset.name}`)}
-            >
-              <View style={styles.assetLeft}>
-                <Image source={asset.icon} style={styles.assetIcon} />
-                <View>
-                  <Text style={styles.assetName}>{asset.name}</Text>
-                  <Text style={styles.assetType}>{asset.shares} • {asset.type}</Text>
+        {/* Owned Assets */}
+        <View style={{ marginHorizontal: 20, marginBottom: 16 }}>
+          <Text style={[styles.sectionTitle, { color: isDarkMode ? "#fff" : "#000" }]}>Owned Assets</Text>
+          {filteredAssets.length === 0 ? (
+            <Text style={{ color: isDarkMode ? "#ccc" : "#999", marginTop: 10 }}>No assets owned yet</Text>
+          ) : (
+            filteredAssets.map((asset) => (
+              <TouchableOpacity
+                key={asset.id}
+                style={[
+                  styles.assetItemUnderline,
+                  { borderBottomColor: isDarkMode ? "rgba(255,255,255,0.2)" : "#E0E0E0" },
+                ]}
+              >
+                <View style={styles.assetLeft}>
+                  {/* Placeholder image since WalletContext assets may not have icons */}
+                  <Image
+                    source={require("../../assets/image/art.jpeg")}
+                    style={styles.assetIcon}
+                  />
+                  <View>
+                    <Text style={[styles.assetName, { color: isDarkMode ? "#ccc" : "#666" }]}>{asset.name}</Text>
+                    <Text style={[styles.assetType, { color: isDarkMode ? "#9ca3af" : "#999" }]}>
+                      {asset.quantity} • {asset.type || "Token"}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-              <View style={styles.assetRight}>
-                <Text style={styles.assetValue}>${asset.currentValue.toLocaleString()}</Text>
-                <Text
-                  style={[
-                    styles.assetRoi,
-                    { color: asset.roiColor || (asset.roi > 0 ? "#00e676" : "#ff5252") },
-                  ]}
-                >
-                  {asset.roi > 0 ? "↑" : "↓"} {Math.abs(asset.roi)}%
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+                <View style={styles.assetRight}>
+                  <Text style={[styles.assetValue, { color: isDarkMode ? "#fff" : "#000" }]}>
+                    {formatAmountByCurrency(
+                      (asset.tokenPrice || 0) * (asset.quantity || 0),
+                      currency
+                    )}
+                  </Text>
+                  <Text style={[styles.assetRoi, { color: isDarkMode ? "#42e7a2" : "#02af6a" }]}>
+                    ↑ 0%
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
         </View>
 
         {/* Recent Activity */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          {recentActivity.map((item) => (
-            <View key={item.id} style={styles.activityItem}>
-              <View style={styles.activityIcon}>
-                <MaterialIcons
-                  name={
-                    item.action.includes("Dividend")
-                      ? "payments"
-                      : item.action === "Bought"
-                      ? "add-circle-outline"
-                      : "remove-circle-outline"
-                  }
-                  size={20}
-                  color="#00e676"
-                />
+          <Text style={[styles.sectionTitle, { color: isDarkMode ? "#fff" : "#000" }]}>Recent Activity</Text>
+          {history.length === 0 ? (
+            <Text style={{ color: isDarkMode ? "#ccc" : "#999", marginTop: 10 }}>No recent activity</Text>
+          ) : (
+            history.map((item) => (
+              <View
+                key={item.id}
+                style={[
+                  styles.activityItem,
+                  { borderBottomColor: isDarkMode ? "rgba(255,255,255,0.2)" : "#E0E0E0" },
+                ]}
+              >
+                <View style={[
+                  styles.activityIcon,
+                  { backgroundColor: isDarkMode ? "#07392dff" : "#FAFAFA" },
+                ]}>
+                  <MaterialIcons
+                    name={
+                      item.type === "Deposit"
+                        ? "payments"
+                        : item.type === "Withdraw"
+                        ? "account-balance-wallet"
+                        : item.type === "Buy"
+                        ? "add-circle-outline"
+                        : item.type === "Sell"
+                        ? "remove-circle-outline"
+                        : item.type === "Send"
+                        ? "send"
+                        : "call-received"
+                    }
+                    size={20}
+                    color={isDarkMode ? "#00e676" : "#02af6a"}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.activityText, { color: isDarkMode ? "#ccc" : "#666" }]}>
+                    {item.type} {item.assetName || item.assetId || ""}
+                  </Text>
+                  <Text style={[styles.activityAmount, { color: isDarkMode ? "#9ca3af" : "#999" }]}>
+                    {item.amount} units
+                  </Text>
+                </View>
+                <Text style={[styles.activityTime, { color: isDarkMode ? "#9ca3af" : "#999" }]}>{item.date}</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.activityText}>
-                  {item.action} {item.asset}
-                </Text>
-                <Text style={styles.activityAmount}>{item.amount}</Text>
-              </View>
-              <Text style={styles.activityTime}>{item.time}</Text>
+            ))
+          )}
+        </View>
+
+        {/* Upcoming Payouts */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: isDarkMode ? "#fff" : "#000" }]}>Upcoming Payouts</Text>
+          {upcomingPayouts.map((p) => (
+            <View
+              key={p.id}
+              style={[
+                styles.rowBetween,
+                { borderBottomColor: isDarkMode ? "rgba(255,255,255,0.2)" : "#E0E0E0" },
+              ]}
+            >
+              <Text style={[styles.assetName, { color: isDarkMode ? "#ccc" : "#666" }]}>{p.asset}</Text>
+              <Text style={{ color: isDarkMode ? "#9ca3af" : "#999" }}>
+                {formatAmountByCurrency(p.amountUSD, currency)} • {p.date}
+              </Text>
             </View>
           ))}
         </View>
@@ -270,171 +374,102 @@ export default function PortfolioScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
-  },
-  welcomeText: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#fff",
-  },
-  subText: {
-    fontSize: 14,
-    color: "#9ca3af",
-    marginTop: 4,
-  },
-  card: {
-    marginHorizontal: 20,
-    padding: 16,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 16,
-    marginTop: 10,
-    marginBottom: 10,
-  },
-  label: {
-    fontSize: 12,
-    color: "#9ca3af",
-  },
-  value: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#fff",
-    marginVertical: 4,
-  },
-  gain: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  chartWrapper: {
-    marginTop: 0,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
   },
-  rangeTabs: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: -30,
-    marginBottom: 10,
-  },
-  rangeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-    marginHorizontal: 4,
-  },
-  activeRangeButton: {
-    backgroundColor: "#00e676",
-  },
-  rangeText: {
-    color: "#aaa",
-    fontSize: 12,
-  },
-  activeRangeText: {
-    color: "#000",
-    fontWeight: "bold",
-  },
-  filterRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginHorizontal: 20,
-    marginBottom: 16,
-    gap: 10,
-  },
-  filterButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-    backgroundColor: "rgba(255,255,255,0.1)",
-  },
-  activeFilter: {
-    backgroundColor: "#00e676",
-  },
-  filterText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  activeFilterText: {
-    color: "#000",
-  },
-  section: {
-    marginHorizontal: 20,
-    padding: 16,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderRadius: 16,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#fff",
-    marginBottom: 12,
-  },
-  assetItem: {
+  balanceHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.1)",
+    marginTop: 90,
+    paddingHorizontal: 10,
   },
-  assetLeft: {
+  balanceLabel: { fontSize: 16, fontWeight: "600" },
+  performanceContainer: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
+  performanceLabel: { fontSize: 12, fontWeight: "500" },
+  percentageBox: {
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  percentageValue: { fontSize: 12, fontWeight: "500" },
+  balanceContentRow: { flexDirection: "row", alignItems: "flex-start" },
+  balanceValue: { fontSize: 25, fontWeight: "bold" },
+  balanceChange: { fontSize: 13, marginTop: 4 },
+  rangeTabs: {
     flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 12,
+    gap: 16,
+    marginBottom: 10,
+    marginRight: 150,
+  },
+  rangeButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 5,
+  },
+  rangeText: { fontSize: 14, fontWeight: "600" },
+  filterRow: { flexDirection: "row", justifyContent: "center", marginBottom: 16, gap: 20 },
+  filterText: { fontSize: 15, fontWeight: "600" },
+  section: { marginHorizontal: 5, padding: 16, marginBottom: 1 },
+  sectionTitle: { fontSize: 16, fontWeight: "bold" },
+  rowBetween: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
     alignItems: "center",
-    flex: 1,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
   },
-  assetIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    marginRight: 12,
+  assetItemUnderline: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 20,
+    borderBottomWidth: 1,
   },
-  assetName: {
-    fontSize: 14,
-    color: "#fff",
-    fontWeight: "600",
-  },
-  assetType: {
-    fontSize: 12,
-    color: "#9ca3af",
-  },
-  assetRight: {
-    alignItems: "flex-end",
-  },
-  assetValue: {
-    fontSize: 14,
-    color: "#fff",
-    fontWeight: "600",
-  },
-  assetRoi: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
+  assetLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
+  assetIcon: { width: 40, height: 40, borderRadius: 8, marginRight: 12 },
+  assetName: { fontSize: 14, fontWeight: "600" },
+  assetType: { fontSize: 12 },
+  assetRight: { alignItems: "flex-end" },
+  assetValue: { fontSize: 14, fontWeight: "600" },
+  assetRoi: { fontSize: 12, fontWeight: "600" },
   activityItem: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: 8,
+    padding: 15,
+    paddingLeft: 1,
+    borderBottomWidth: 1,
   },
   activityIcon: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "rgba(0,230,118,0.1)",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
   },
-  activityText: {
-    fontSize: 14,
-    color: "#fff",
+  activityText: { fontSize: 14 },
+  activityAmount: { fontSize: 12 },
+  activityTime: { fontSize: 12, marginLeft: 8 },
+  dayLabelsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 8,
   },
-  activityAmount: {
-    fontSize: 12,
-    color: "#9ca3af",
+  dayLabelButton: {
+    paddingHorizontal: 2,
+    paddingVertical: 2,
+    borderRadius: 5,
+    minWidth: 32,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  activityTime: {
-    fontSize: 12,
-    color: "#9ca3af",
-    marginLeft: 8,
-  },
+  dayLabelText: { fontSize: 12, fontWeight: "600" },
 });

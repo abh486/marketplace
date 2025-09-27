@@ -2,63 +2,68 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import OpenPage from '../screens/OpenPage';
-import LogIn from '../screens/LogIn';
-import SignIn from '../screens/SignUp';
-import OnboardingScreen from '../screens/OnboardingScreen';
 
-import RealEstateSingleView from '../screens/properties/RealEstateSingleView';
+import LogIn from '../screens/LogIn';
+import SignUp from '../screens/SignUp';
+
 import WalletInterface from '../screens/wallet/WalletInterface';
 import Profile from '../screens/profile/Profile';
 import MapScreen from '../screens/properties/MapScreen';
-import GoldSingleView from '../screens/Gold/GoldSingleView';
-import GreenSingleView from '../screens/Green/GreenSingleView';
-import FinancialSingleView from '../screens/Financial/FinancialSingleView';
+
+import AssetDetails from '../screens/Market/AssetDetails';
+
 import Home from '../screens/home/Home';
-import ZeroPage from '../screens/properties/ZeroPage';
-import AssetDetails from '../screens/properties/AssetDetails';
+import AiPage from '../screens/properties/AiPage';
 import MarketScreen from '../screens/properties/MarketScreen';
 import PortfolioScreen from '../screens/properties/PortfolioScreen';
 
-
+import NotificationScreen from '../screens/NotificationScreen';
+import PersonalInfo from '../screens/profile/PersonalInfo';
+import Rewards from '../screens/profile/Rewards';
+import SendScreen from '../screens/wallet/SendScreen';
+import ReceiveScreen from '../screens/wallet/ReceiveScreen';
+import DepositScreen from '../screens/wallet/DepositScreen';
+import WithdrawScreen from '../screens/wallet/WithdrawScreen';
+import BuyScreen from '../screens/Market/BuyScreen';
+import LinkedBankAccountsScreen from '../screens/profile/LinkedBankAccountsScreen';
+import LoginScreen from '../screens/LoginScreen';
+import Test from '../screens/Test';
+import Register from '../screens/Register';
 const Stack = createNativeStackNavigator();
 
 const AppNavigator = () => {
   return (
       <NavigationContainer>
-      <Stack.Navigator initialRouteName="Home">
+      <Stack.Navigator initialRouteName="LoginScreen">
 
-
-
-        <Stack.Screen name="Onboarding" component={OnboardingScreen}
+         <Stack.Screen name="LoginScreen" component={LoginScreen}
+        options={{ headerShown: false }}  />
+          <Stack.Screen name="Register" component={Register}
         options={{ headerShown: false }}  />
 
-        <Stack.Screen name="OpenPage" component={OpenPage}
-        options={{ headerShown: false }}  />
 
         <Stack.Screen name="LogIn" component={LogIn}
         options={{ headerShown: false }}  />
 
-        <Stack.Screen name="SignIn" component={SignIn} 
+        <Stack.Screen name="SignUp" component={SignUp} 
         options={{ headerShown: false }} />
 
-        {/* <Stack.Screen name="AllScreen" component={AllScreen} 
-        options={{ headerShown: false }} /> */}
+        
 
         <Stack.Screen name="MarketScreen" component={MarketScreen}
          options={{ headerShown: false }}  />
 
-        <Stack.Screen name="RealEstateSingleView" component={RealEstateSingleView}
+        
+
+         
+
+         <Stack.Screen name="AssetDetails" component={AssetDetails}
          options={{ headerShown: false }}  />
 
-         <Stack.Screen name="GoldSingleView" component={GoldSingleView}
+           <Stack.Screen name="BuyScreen" component={BuyScreen}
          options={{ headerShown: false }}  />
 
-         <Stack.Screen name="GreenSingleView" component={GreenSingleView}
-         options={{ headerShown: false }}  />
-
-         <Stack.Screen name="FinancialSingleView" component={FinancialSingleView}
-         options={{ headerShown: false }}  />
+         
 
 
 
@@ -76,11 +81,30 @@ const AppNavigator = () => {
 
         <Stack.Screen name="Marketplace" component={MarketScreen}
          options={{ headerShown: false }}  />
-        <Stack.Screen name="ZeroPage" component={ZeroPage}
+        <Stack.Screen name="AiPage" component={AiPage}
          options={{ headerShown: false }}  />
-        <Stack.Screen name="AssetDetails" component={AssetDetails}
-         options={{ headerShown: false }}  />
+      
          <Stack.Screen name="PortfolioScreen" component={PortfolioScreen}
+         options={{ headerShown: false }}  />
+         
+         <Stack.Screen name="NotificationScreen" component={NotificationScreen}
+         options={{ headerShown: false }}  />
+          <Stack.Screen name="PersonalInfo" component={PersonalInfo}
+         options={{ headerShown: false }}  />
+          <Stack.Screen name="Rewards" component={Rewards}
+         options={{ headerShown: false }}  />
+          <Stack.Screen name="SendScreen" component={SendScreen}
+         options={{ headerShown: false }}  />
+         <Stack.Screen name="ReceiveScreen" component={ReceiveScreen}
+         options={{ headerShown: false }}  />
+         <Stack.Screen name="DepositScreen" component={DepositScreen}
+         options={{ headerShown: false }}  />
+          <Stack.Screen name="WithdrawScreen" component={WithdrawScreen}
+         options={{ headerShown: false }}  />
+         <Stack.Screen name="LinkedBankAccountsScreen" component={LinkedBankAccountsScreen}
+         options={{ headerShown: false }}  />
+        
+         <Stack.Screen name="Test" component={Test}
          options={{ headerShown: false }}  />
         
 

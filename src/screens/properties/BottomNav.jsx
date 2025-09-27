@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useNavigationState } from '@react-navigation/native';
+import { useTheme } from '../../Theme/ThemeContext'; // ✅ ADDED — adjust path as needed
 
 const navItems = [
   { id: 'home', icon: 'home', label: 'Home', screen: 'Home' },
@@ -14,18 +15,19 @@ const navItems = [
 
 const BottomNav = () => {
   const navigation = useNavigation();
+  const { isDarkMode } = useTheme(); // ✅ Get current theme mode
 
- const currentRouteName = useNavigationState(state => {
-  if (
-    state &&
-    Array.isArray(state.routes) &&
-    typeof state.index === 'number' &&
-    state.routes[state.index]
-  ) {
-    return state.routes[state.index].name || 'Marketplace';
-  }
-  return 'Marketplace';
-});
+  const currentRouteName = useNavigationState(state => {
+    if (
+      state &&
+      Array.isArray(state.routes) &&
+      typeof state.index === 'number' &&
+      state.routes[state.index]
+    ) {
+      return state.routes[state.index].name || 'Marketplace';
+    }
+    return 'Marketplace';
+  });
 
   const activeTab = navItems.find(item => item.screen === currentRouteName)?.id || 'store';
 
@@ -47,15 +49,26 @@ const BottomNav = () => {
     navigation.navigate(screenName);
   };
 
-  // Static dark theme styles and colors (no toggle)
-  const gradientColors = ['#012419ff', '#012419ff', '#012419ff']; // dark background gradient
+  // ✅ YOUR EXACT STATIC STYLES — NOW CONDITIONAL ON isDarkMode
+  const gradientColors = isDarkMode
+    ? ['#012419ff', '#012419ff', '#012419ff']
+    : ['#FFFFFF', '#FFFFFF', '#FFFFFF']; // Pure white for light mode
+
   const navBg = 'transparent';
-  const iconActiveBg = 'rgba(0,255,102,0.18)'; // neon green glass behind active icon
-  const iconInactiveBg = 'rgba(255,255,255,0.07)'; // subtle glass behind inactive icons
-  const iconActiveColor = '#fff'; // neon green for active icon
-  const iconInactiveColor = '#aaa'; // muted gray inactive icon color
-  const textActive = '#fff'; // bright text active
-  const textInactive = '#7ad1a5'; // soft green text inactive
+
+  const iconActiveBg = isDarkMode
+    ? 'rgba(0,255,102,0.18)'
+    : 'rgba(0,219,132,0.15)'; // Green glow in light mode too
+
+  const iconInactiveBg = isDarkMode
+    ? 'rgba(255,255,255,0.07)'
+    : 'rgba(0,0,0,0.05)'; // Subtle in light
+
+  const iconActiveColor = isDarkMode ? '#fff' : '#000'; // Active icon color
+  const iconInactiveColor = isDarkMode ? '#aaa' : '#888'; // Inactive icon color
+
+  const textActive = isDarkMode ? '#fff' : '#000';
+  const textInactive = isDarkMode ? '#7ad1a5' : '#037145'; // Keep your soft green in dark, use primary in light
 
   return (
     <View style={styles.bottomNavContainer}>
@@ -103,7 +116,7 @@ const BottomNav = () => {
                     <Text
                       style={[
                         styles.navText,
-                        { color: isActive ? textActive : textActive },
+                        { color: isActive ? textActive : textInactive }, // ✅ Fixed: was always textActive
                         isActive && styles.navTextActive,
                       ]}
                     >
@@ -145,9 +158,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 0,
     width: '100%',
-    backgroundColor: '#001A13', // Dark background
+    backgroundColor: 'transparent', // ✅ Let gradient handle bg
     borderTopWidth: 0.5,
-    borderTopColor: 'rgba(255,255,255,0.08)', // Very subtle top border
+    borderTopColor: 'rgba(255,255,255,0.08)',
   },
   navItemWrapper: {
     flex: 1,
@@ -173,11 +186,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
-    backgroundColor: 'rgba(255,255,255,0.07)',
   },
   activeIconContainer: {
-    backgroundColor: 'rgba(0,255,153,0.15)', // Soft neon green glass
-    shadowColor: '#00FF9D',
+    shadowColor: '#02311eff',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -187,10 +198,8 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '600',
     letterSpacing: 0.3,
-    color: '#fff', // Soft green for inactive text
   },
   navTextActive: {
-    color: '#fff', // White for active text
     fontWeight: '700',
     textShadowColor: 'rgba(0, 0, 0, 0.1)',
     textShadowOffset: { width: 0, height: 1 },

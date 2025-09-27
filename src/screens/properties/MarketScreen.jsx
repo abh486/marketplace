@@ -16,23 +16,12 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
+import { useTheme } from "../../Theme/ThemeContext"; // ✅ ADDED
 
 import Navbar from "../properties/Navbar";
 import BottomNav from "../properties/BottomNav";
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-
-const COLORS = {
-  backgroundGradient1: '#001A13',
-  backgroundGradient2: '#003B28',
-  backgroundGradient3: '#017148ff',
-  accentColor: '#fff',
-  cardBackground: '#07392dff',
-  starFilled: '#FFD700', // realistic gold star
-  starEmpty: '#048d51ff',
-  overlayIconBg: 'rgba(0,0,0,0.35)',
-  grey: '#aaa',
-};
 
 const categories = [
   { label: 'All', icon: 'grid', key: 'All' },
@@ -132,10 +121,10 @@ const ASSETS = [
   },
 ];
 
-function ReviewStars({ rating, reviews }) {
+function ReviewStars({ rating, reviews, isDarkMode }) {
   const stars = [];
   for (let i = 1; i <= 5; i++) {
-    const color = rating >= i ? COLORS.starFilled : COLORS.grey;
+    const color = rating >= i ? (isDarkMode ? '#FFD700' : '#FFC107') : (isDarkMode ? '#aaa' : '#ccc');
     stars.push(
       <FontAwesome key={i} name="star" size={10} color={color} style={{ marginRight: 2 }} />
     );
@@ -145,12 +134,12 @@ function ReviewStars({ rating, reviews }) {
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         {stars}
       </View>
-      <Text style={[styles.reviewText, { color: COLORS.accentColor }]}>{rating} ({reviews})</Text>
+      <Text style={[styles.reviewText, { color: isDarkMode ? "#fff" : "#000" }]}>{rating} ({reviews})</Text>
     </View>
   );
 }
 
-function ImageSlider({ images }) {
+function ImageSlider({ images, isDarkMode }) {
   const scrollX = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -187,14 +176,14 @@ function ImageSlider({ images }) {
       />
       <View style={styles.pagination}>
         {images.map((_, i) => (
-          <Animated.View key={i.toString()} style={[styles.dot, { opacity: currentIndex === i ? 1 : 0.3 }]} />
+          <Animated.View key={i.toString()} style={[styles.dot, { opacity: currentIndex === i ? 1 : 0.3, backgroundColor: isDarkMode ? "#fff" : "#000" }]} />
         ))}
       </View>
     </View>
   );
 }
 
-function AssetCard({ asset, animatedStyle, onPress }) {
+function AssetCard({ asset, animatedStyle, onPress, isDarkMode }) {
   const onFavoritePress = () => {};
   const onSharePress = () => {
     Share.share({ message: `Check out this asset: ${asset.name} for ${asset.price}!` });
@@ -202,34 +191,34 @@ function AssetCard({ asset, animatedStyle, onPress }) {
 
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onPress}>
-      <Animated.View style={[styles.assetCard, animatedStyle]}>
+      <Animated.View style={[styles.assetCard, { backgroundColor: isDarkMode ? "#07392dff" : "#FAFAFA" }, animatedStyle]}>
         <View style={styles.imageWrapper}>
-          <ImageSlider images={asset.images} />
+          <ImageSlider images={asset.images} isDarkMode={isDarkMode} />
 
           {/* Category tag at top of image with green bg */}
           <View style={styles.topTagRow}>
-            <View style={styles.topTag}>
-              <Text style={styles.topTagText}>{asset.category}</Text>
+            <View style={[styles.topTag, { backgroundColor: isDarkMode ? 'rgba(0,150,100,0.8)' : 'rgba(2, 175, 106, 0.8)' }]}>
+              <Text style={[styles.topTagText, { color: isDarkMode ? "#fff" : "#fff" }]}>{asset.category}</Text>
             </View>
           </View>
 
           <TouchableOpacity style={[styles.iconBtn, styles.favBtn]} onPress={onFavoritePress}>
-            <Icon name="heart" size={20} color="white" />
+            <Icon name="heart" size={20} color={isDarkMode ? "white" : "#000"} />
           </TouchableOpacity>
           <TouchableOpacity style={[styles.iconBtn, styles.shareBtn]} onPress={onSharePress}>
-            <Icon name="share-2" size={20} color="white" />
+            <Icon name="share-2" size={20} color={isDarkMode ? "white" : "#000"} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.assetContent}>
           <View style={styles.rowBetween}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.assetTitle} numberOfLines={1}>{asset.name}</Text>
-              <Text style={styles.assetLocation}>{asset.location}</Text>
+              <Text style={[styles.assetTitle, { color: isDarkMode ? "#fff" : "#000" }]} numberOfLines={1}>{asset.name}</Text>
+              <Text style={[styles.assetLocation, { color: isDarkMode ? "#fff" : "#000" }]}>{asset.location}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.assetPrice}>{asset.price}</Text>
-              <ReviewStars rating={asset.rating} reviews={asset.reviews} />
+              <Text style={[styles.assetPrice, { color: isDarkMode ? "#fff" : "#000" }]}>{asset.price}</Text>
+              <ReviewStars rating={asset.rating} reviews={asset.reviews} isDarkMode={isDarkMode} />
             </View>
           </View>
         </View>
@@ -239,6 +228,7 @@ function AssetCard({ asset, animatedStyle, onPress }) {
 }
 
 export default function MarketplaceScreen({ navigation }) {
+  const { isDarkMode } = useTheme(); // ✅ ADDED
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showSearch, setShowSearch] = useState(false);
@@ -284,18 +274,22 @@ export default function MarketplaceScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Background Gradient */}
-      <LinearGradient
-        colors={[COLORS.backgroundGradient1, COLORS.backgroundGradient2, COLORS.backgroundGradient3]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      >
-        <LinearGradient
-          colors={["rgba(255,255,255,0.02)", "rgba(0,0,0,0.6)"]}
-          style={StyleSheet.absoluteFillObject}
-        />
-      </LinearGradient>
+      {/* Background Gradient — ONLY in Dark Mode */}
+      {isDarkMode && (
+        <>
+          <LinearGradient
+            colors={['#001A13', '#003B28', '#017148ff']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          >
+            <LinearGradient
+              colors={["rgba(255,255,255,0.02)", "rgba(0,0,0,0.6)"]}
+              style={StyleSheet.absoluteFillObject}
+            />
+          </LinearGradient>
+        </>
+      )}
 
       <SafeAreaView style={{ flex: 1 }}>
         <Navbar />
@@ -304,23 +298,23 @@ export default function MarketplaceScreen({ navigation }) {
         <View style={styles.headerBar}>
           {!showSearch ? (
             <>
-              <Text style={styles.heading}>Explore Marketplace</Text>
+              <Text style={[styles.heading, { color: isDarkMode ? "#fff" : "#000" }]}>Explore Marketplace</Text>
               <TouchableOpacity onPress={() => setShowSearch(true)}>
-                <Icon style={styles.search} name="search" size={18} color={COLORS.accentColor} />
+                <Icon style={styles.search} name="search" size={18} color={isDarkMode ? "#fff" : "#000"} />
               </TouchableOpacity>
             </>
           ) : (
-            <View style={styles.searchWrapper}>
+            <View style={[styles.searchWrapper, { backgroundColor: isDarkMode ? "#07392dff" : "#F5F5F5" }]}>
               <TextInput
                 placeholder="Search assets..."
-                placeholderTextColor="#aaa"
+                placeholderTextColor={isDarkMode ? "#aaa" : "#999"}
                 value={search}
                 onChangeText={setSearch}
-                style={styles.searchInput}
+                style={[styles.searchInput, { color: isDarkMode ? "#fff" : "#000" }]}
                 autoFocus
               />
               <TouchableOpacity onPress={() => { setShowSearch(false); setSearch(''); }}>
-                <Icon name="x" size={18} color={COLORS.accentColor} />
+                <Icon name="x" size={18} color={isDarkMode ? "#fff" : "#000"} />
               </TouchableOpacity>
             </View>
           )}
@@ -334,7 +328,7 @@ export default function MarketplaceScreen({ navigation }) {
               return (
                 <TouchableOpacity
                   key={cat.key}
-                  style={[styles.categoryTabWrapper, active && styles.categoryTabWrapperActive]}
+                  style={[styles.categoryTabWrapper, active && { borderBottomColor: isDarkMode ? "#048d51ff" : "#02af6a" }]}
                   onPress={() => setSelectedCategory(cat.key)}
                   activeOpacity={0.7}
                 >
@@ -343,14 +337,14 @@ export default function MarketplaceScreen({ navigation }) {
                       <Icon
                         name={cat.icon}
                         size={16}
-                        color={COLORS.starEmpty}
+                        color={isDarkMode ? "#048d51ff" : "#02af6a"}
                         style={{ marginRight: 6 }}
                       />
                     )}
                     <Text
                       style={[
                         styles.categoryTabLabel,
-                        active ? styles.categoryTabLabelActive : styles.categoryTabLabelInactive,
+                        active ? { color: isDarkMode ? "#048d51ff" : "#02af6a", fontWeight: 'bold' } : { color: isDarkMode ? "#aaa" : "#666" },
                       ]}
                     >
                       {cat.label}
@@ -376,6 +370,7 @@ export default function MarketplaceScreen({ navigation }) {
                 opacity: animatedValues.opacity[index] || new Animated.Value(1),
               }}
               onPress={() => navigation.navigate('AssetDetails', { asset: item })}
+              isDarkMode={isDarkMode}
             />
           )}
         />
@@ -386,6 +381,7 @@ export default function MarketplaceScreen({ navigation }) {
   );
 }
 
+// ✅ Styles — PRESERVED YOUR DARK THEME, ADDED LIGHT THEME
 const styles = StyleSheet.create({
   headerBar: {
     flexDirection: 'row',
@@ -398,17 +394,14 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: COLORS.accentColor,
     marginTop: 50,
   },
   search: {
     marginTop: 50,
-    color: COLORS.accentColor,
   },
   searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.cardBackground,
     borderRadius: 8,
     paddingHorizontal: 8,
     flex: 1,
@@ -417,7 +410,6 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    color: COLORS.accentColor,
     paddingHorizontal: 8,
   },
   categoriesWrapper: {
@@ -430,23 +422,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 3,
     borderBottomColor: 'transparent',
   },
-  categoryTabWrapperActive: {
-    borderBottomColor: COLORS.starEmpty,
-  },
   tabInner: { flexDirection: 'row', alignItems: 'center' },
   categoryTabLabel: {
     fontWeight: '500',
     fontSize: 14,
   },
-  categoryTabLabelInactive: {
-    color: '#aaa',
-  },
-  categoryTabLabelActive: {
-    color: COLORS.starEmpty,
-    fontWeight: 'bold',
-  },
   assetCard: {
-    backgroundColor: COLORS.cardBackground,
     marginHorizontal: 16,
     marginBottom: 24,
     overflow: 'hidden',
@@ -471,7 +452,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
   },
-  dot: { height: 8, width: 8, borderRadius: 4, backgroundColor: '#fff', marginHorizontal: 4 },
+  dot: { height: 8, width: 8, borderRadius: 4, marginHorizontal: 4 },
   iconBtn: {
     position: 'absolute',
     top: 14,
@@ -488,29 +469,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   topTag: {
-    backgroundColor: 'rgba(0,150,100,0.8)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
   },
   topTagText: {
-    color: COLORS.accentColor,
     fontWeight: 'bold',
     fontSize: 12,
   },
   assetContent: { paddingHorizontal: 12, paddingVertical: 10 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  assetTitle: { fontWeight: 'bold', color: COLORS.accentColor, fontSize: 18, flex: 1, marginBottom: 4 },
-  assetLocation: { fontSize: 14, color: COLORS.accentColor },
+  assetTitle: { fontWeight: 'bold', fontSize: 18, flex: 1, marginBottom: 4 },
+  assetLocation: { fontSize: 14 },
   reviewContainer: { flexDirection: 'row', alignItems: 'center' },
   assetPrice: {
     fontWeight: 'bold',
-    color: COLORS.accentColor,
     fontSize: 16,
     marginBottom: 4,
   },
   reviewText: {
-    color: COLORS.accentColor,
     fontSize: 12,
     marginLeft: 6,
     fontWeight: '600',

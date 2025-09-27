@@ -5,8 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Modal,
-  TextInput,
   Alert,
   Clipboard,
   Platform,
@@ -14,120 +12,144 @@ import {
 import LinearGradient from "react-native-linear-gradient";
 import Icon from "react-native-vector-icons/Feather";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
+import { useWallet } from "../Context/WalletContext";
+import { useTheme } from "../../Theme/ThemeContext";
 
 import Navbar from "../properties/Navbar";
 import BottomNav from "../properties/BottomNav";
+import vaultApi from "../../api/vaultApi"; // ✅ Fireblocks API client
 
-// ----------------- Mock Data -----------------
-const tokens = [
-  { id: 1, symbol: "ETH", name: "Ethereum", price: 3050.25, quantity: 2.45 },
-  { id: 2, symbol: "BTC", name: "Bitcoin", price: 61000.0, quantity: 0.5 },
-  { id: 3, symbol: "USDT", name: "Tether", price: 1.0, quantity: 1500.0 },
-  { id: 4, symbol: "DAI", name: "Dai", price: 0.998, quantity: 875.3 },
-];
-
-const tokenizedAssets = [
-  { id: 1, name: "Luxury Apartment", type: "Real Estate", price: 2500, quantity: 2 },
-  { id: 2, name: "Gold Token", type: "Gold", price: 60, quantity: 10 },
-];
-
-const transactions = [
-  { id: 1, token: "ETH", amount: 1.2, type: "sent", date: "2023-10-05", status: "completed", txId: "0xabc123..." },
-  { id: 2, token: "BTC", amount: 0.1, type: "received", date: "2023-10-04", status: "completed", txId: "0xdef456..." },
-  { id: 3, token: "USDT", amount: 500, type: "sent", date: "2023-10-03", status: "failed", txId: "0xghi789..." },
-  { id: 4, token: "DAI", amount: 200, type: "received", date: "2023-10-02", status: "completed", txId: "0xjkl012..." },
-];
-
-const wallets = [
-  { id: 1, name: "Main Wallet", address: "0x1a2b...cdef" },
-  { id: 2, name: "Savings Wallet", address: "0x3c4d...ef12" },
-  { id: 3, name: "Trading Wallet", address: "0x5e6f...34ab" },
-];
-
-export default function WalletInterface() {
+export default function WalletInterface({ navigation }) {
+  const { isDarkMode } = useTheme();
+  const { balance, assets, history, user } = useWallet();
   const [activeTab, setActiveTab] = useState("tokens");
-  const [sendModalVisible, setSendModalVisible] = useState(false);
-  const [receiveModalVisible, setReceiveModalVisible] = useState(false);
-  const [swapModalVisible, setSwapModalVisible] = useState(false);
-  const [depositModalVisible, setDepositModalVisible] = useState(false);
-  const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
-  const [selectedWallet, setSelectedWallet] = useState(wallets[0]);
-  const [totalBalance, setTotalBalance] = useState(0);
+  const [totalBalance, setTotalBalance] = useState(balance || 0);
 
-  const username = "Sam Kruss";
+  // Fireblocks vault state
+  const [vaultInfo, setVaultInfo] = useState(null);
+  const [loadingVault, setLoadingVault] = useState(true);
+  const [vaultError, setVaultError] = useState(null);
 
-  // Calculate total balance from tokens + tokenized assets
+  // Update total balance from context
   useEffect(() => {
-    let total = 0;
-    tokens.forEach((t) => (total += t.price * t.quantity));
-    tokenizedAssets.forEach((a) => (total += a.price * a.quantity));
-    setTotalBalance(total);
+    setTotalBalance(balance || 0);
+  }, [balance]);
+
+  // Fetch Fireblocks vault info on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await vaultApi.getVaultInfo();
+        setVaultInfo(res.data);
+      } catch (err) {
+        setVaultError(err.message);
+      } finally {
+        setLoadingVault(false);
+      }
+    })();
   }, []);
 
-  // Handlers
-  const handleSend = () => {
-    Alert.alert("Transaction", "Send initiated!");
-    setSendModalVisible(false);
-  };
-  const handleSwap = () => {
-    Alert.alert("Swap", "Swap initiated!");
-    setSwapModalVisible(false);
-  };
-  const handleDeposit = () => {
-    Alert.alert("Deposit", "Deposit flow started...");
-    setDepositModalVisible(false);
-  };
-  const handleWithdraw = () => {
-    Alert.alert("Withdraw", "Withdraw flow started...");
-    setWithdrawModalVisible(false);
-  };
+  // Only real Fireblocks wallets—no fallback
+  const dynamicWallets =
+    vaultInfo?.wallets?.map((w, i) => ({
+      id: i + 1,
+      name: w.assetId || "Fireblocks Wallet",
+      address: w.address,
+    })) || [];
+
+  const [selectedWallet, setSelectedWallet] = useState(
+    dynamicWallets[0] || null
+  );
 
   const copyToClipboard = (text) => {
-    Clipboard.setString(text);
-    Alert.alert("Copied", "Address copied to clipboard!");
+    try {
+      if (Platform.OS === "web") navigator.clipboard.writeText(text || "");
+      else Clipboard.setString(text || "");
+      Alert.alert("Copied", "Address copied to clipboard!");
+    } catch {
+      Alert.alert("Copied", text || "");
+    }
   };
 
+  // -------- Render Sections --------
   const renderTokens = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Assets</Text>
-      {tokens.map((token) => {
-        const totalValue = (token.price * token.quantity).toFixed(2);
+    <View
+      style={[
+        styles.section,
+        { backgroundColor: isDarkMode ? "#07392dff" : "#FAFAFA" },
+      ]}
+    >
+      <Text style={[styles.sectionTitle, { color: isDarkMode ? "#fff" : "#000" }]}>
+        Assets
+      </Text>
+      {(assets || []).map((asset, idx) => {
+        const totalValue = (
+          (asset.tokenPrice || 0) * (asset.quantity || 0)
+        ).toFixed(2);
         return (
-          <View key={token.id} style={styles.tokenRow}>
+          <View
+            key={idx}
+            style={[
+              styles.tokenRow,
+              {
+                borderBottomColor: isDarkMode
+                  ? "rgba(255,255,255,0.1)"
+                  : "#E0E0E0",
+              },
+            ]}
+          >
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={styles.tokenIcon}>
-                <Text style={{ color: "#fff", fontSize: 12 }}>{token.symbol[0]}</Text>
+              <View
+                style={[
+                  styles.tokenIcon,
+                  { backgroundColor: isDarkMode ? "#04523C" : "#02af6a" },
+                ]}
+              >
+                <Text style={{ color: "#fff", fontSize: 12 }}>
+                  {asset.symbol ? asset.symbol[0] : asset.name?.[0] || "T"}
+                </Text>
               </View>
               <View>
-                <Text style={styles.tokenName}>{token.name}</Text>
-                <Text style={styles.tokenSymbol}>{token.symbol}</Text>
+                <Text
+                  style={[
+                    styles.tokenName,
+                    { color: isDarkMode ? "#fff" : "#000" },
+                  ]}
+                >
+                  {asset.name}
+                </Text>
+                <Text
+                  style={[
+                    styles.tokenSymbol,
+                    { color: isDarkMode ? "#9ca3af" : "#666" },
+                  ]}
+                >
+                  {asset.symbol || "Token"}
+                </Text>
               </View>
             </View>
             <View style={styles.tokenValues}>
-              <Text style={styles.tokenPrice}>${token.price.toFixed(2)}</Text>
-              <Text style={styles.tokenAmount}>{token.quantity} {token.symbol}</Text>
-              <Text style={styles.tokenTotal}>${totalValue}</Text>
-            </View>
-          </View>
-        );
-      })}
-      {tokenizedAssets.map((asset) => {
-        const totalValue = (asset.price * asset.quantity).toFixed(2);
-        return (
-          <View key={asset.id} style={styles.tokenRow}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={styles.tokenIcon}>
-                <Icon name="home" size={14} color="#fff" />
-              </View>
-              <View>
-                <Text style={styles.tokenName}>{asset.name}</Text>
-                <Text style={styles.tokenSymbol}>{asset.type}</Text>
-              </View>
-            </View>
-            <View style={styles.tokenValues}>
-              <Text style={styles.tokenPrice}>${asset.price.toFixed(2)}</Text>
-              <Text style={styles.tokenAmount}>{asset.quantity} units</Text>
-              <Text style={styles.tokenTotal}>${totalValue}</Text>
+              <Text
+                style={[styles.tokenPrice, { color: isDarkMode ? "#fff" : "#000" }]}
+              >
+                ₹{(asset.tokenPrice || 0).toFixed(2)}
+              </Text>
+              <Text
+                style={[
+                  styles.tokenAmount,
+                  { color: isDarkMode ? "#9ca3af" : "#666" },
+                ]}
+              >
+                {asset.quantity || 0} {asset.symbol || "units"}
+              </Text>
+              <Text
+                style={[
+                  styles.tokenTotal,
+                  { color: isDarkMode ? "#10b981" : "#02af6a" },
+                ]}
+              >
+                ₹{totalValue}
+              </Text>
             </View>
           </View>
         );
@@ -136,97 +158,224 @@ export default function WalletInterface() {
   );
 
   const renderHistory = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Transaction History</Text>
-      {transactions.map((tx) => (
-        <View key={tx.id} style={styles.historyItem}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
+    <View
+      style={[
+        styles.section,
+        { backgroundColor: isDarkMode ? "#07392dff" : "#FAFAFA" },
+      ]}
+    >
+      <Text style={[styles.sectionTitle, { color: isDarkMode ? "#fff" : "#000" }]}>
+        Transaction History
+      </Text>
+      {!history?.length ? (
+        <Text style={{ color: isDarkMode ? "#aaa" : "#666", marginTop: 10 }}>
+          No transactions yet
+        </Text>
+      ) : (
+        history.map((tx, i) => {
+          const type = tx.type || "Tx";
+          const amount = tx.amount ?? tx.totalCost ?? 0;
+          const statusColor =
+            tx.status === "completed"
+              ? isDarkMode
+                ? "#10b981"
+                : "#02af6a"
+              : "#f97316";
+          return (
             <View
+              key={i}
               style={[
-                styles.historyIcon,
-                { backgroundColor: tx.type === "sent" ? "#fef2f2" : "#f0fdf4" },
+                styles.historyItem,
+                {
+                  borderBottomColor: isDarkMode
+                    ? "rgba(255,255,255,0.1)"
+                    : "#E0E0E0",
+                },
               ]}
             >
-              <Icon
-                name={tx.type === "sent" ? "arrow-up-right" : "arrow-down-left"}
-                size={16}
-                color={tx.type === "sent" ? "#dc2626" : "#059669"}
-              />
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View
+                  style={[
+                    styles.historyIcon,
+                    {
+                      backgroundColor:
+                        type.toLowerCase() === "sent"
+                          ? isDarkMode
+                            ? "#fef2f2"
+                            : "#ffebeb"
+                          : isDarkMode
+                          ? "#f0fdf4"
+                          : "#e6fff5",
+                    },
+                  ]}
+                >
+                  <Icon
+                    name={
+                      type.toLowerCase() === "sent"
+                        ? "arrow-up-right"
+                        : "arrow-down-left"
+                    }
+                    size={16}
+                    color={
+                      type.toLowerCase() === "sent" ? "#dc2626" : "#02af6a"
+                    }
+                  />
+                </View>
+                <View>
+                  <Text
+                    style={[
+                      styles.historyToken,
+                      { color: isDarkMode ? "#fff" : "#000" },
+                    ]}
+                  >
+                    {type} {amount} {tx.token || ""}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.historyDate,
+                      { color: isDarkMode ? "#9ca3af" : "#666" },
+                    ]}
+                  >
+                    {tx.date || ""}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={[styles.historyStatus, { color: statusColor }]}>
+                  {tx.status || type}
+                </Text>
+                <Text
+                  style={[
+                    styles.txId,
+                    { color: isDarkMode ? "#60a5fa" : "#02af6a" },
+                  ]}
+                  onPress={() => copyToClipboard(tx.txId || "")}
+                >
+                  {tx.txId || ""}
+                </Text>
+              </View>
             </View>
-            <View>
-              <Text style={styles.historyToken}>
-                {tx.type === "sent" ? "Sent" : "Received"} {tx.amount} {tx.token}
-              </Text>
-              <Text style={styles.historyDate}>{tx.date}</Text>
-            </View>
-          </View>
-          <View style={{ alignItems: "flex-end" }}>
-            <Text
-              style={[
-                styles.historyStatus,
-                tx.status === "completed" ? { color: "#10b981" } : { color: "#f97316" },
-              ]}
-            >
-              {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
-            </Text>
-            <Text style={styles.txId} onPress={() => copyToClipboard(tx.txId)}>
-              {tx.txId}
-            </Text>
-          </View>
-        </View>
-      ))}
+          );
+        })
+      )}
     </View>
   );
 
   const renderAccounts = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Wallets & Accounts</Text>
-      {wallets.map((wallet) => (
+    <View
+      style={[
+        styles.section,
+        { backgroundColor: isDarkMode ? "#07392dff" : "#FAFAFA" },
+      ]}
+    >
+      <Text style={[styles.sectionTitle, { color: isDarkMode ? "#fff" : "#000" }]}>
+        Wallets & Accounts
+      </Text>
+
+      {vaultError && (
+        <Text style={{ color: "red", marginBottom: 10 }}>
+          Vault error: {vaultError}
+        </Text>
+      )}
+
+      {dynamicWallets.map((w) => (
         <TouchableOpacity
-          key={wallet.id}
+          key={w.id}
           style={[
             styles.walletItem,
-            selectedWallet?.id === wallet.id && styles.selectedWallet,
+            selectedWallet?.id === w.id && styles.selectedWallet,
+            {
+              borderBottomColor: isDarkMode
+                ? "rgba(255,255,255,0.1)"
+                : "#E0E0E0",
+            },
           ]}
-          onPress={() => setSelectedWallet(wallet)}
+          onPress={() => setSelectedWallet(w)}
         >
           <View>
-            <Text style={styles.walletName}>{wallet.name}</Text>
-            <Text style={styles.walletAddress} numberOfLines={1}>
-              {wallet.address}
+            <Text style={[styles.walletName, { color: isDarkMode ? "#fff" : "#000" }]}>
+              {w.name}
+            </Text>
+            <Text
+              style={[styles.walletAddress, { color: isDarkMode ? "#9ca3af" : "#666" }]}
+              numberOfLines={1}
+            >
+              {w.address}
             </Text>
           </View>
-          <Text style={styles.walletBalance}>
-            {wallet.id === 1 ? "$28,450" : wallet.id === 2 ? "$12,300" : "$4,480"}
+          <Text style={[styles.walletBalance, { color: isDarkMode ? "#fff" : "#000" }]}>
+            {w.id === 1 ? `₹${(balance || 0).toLocaleString()}` : "—"}
           </Text>
         </TouchableOpacity>
       ))}
+
+      {/* Create Fireblocks Vault button */}
+      {!vaultInfo && !loadingVault && (
+        <TouchableOpacity
+          onPress={async () => {
+            try {
+              const res = await vaultApi.createVault();
+              setVaultInfo(res.data);
+              Alert.alert("Vault created", "Your Fireblocks vault is ready!");
+            } catch (e) {
+              Alert.alert("Error", e.message);
+            }
+          }}
+          style={{
+            marginTop: 20,
+            padding: 12,
+            backgroundColor: "#02af6a",
+            borderRadius: 8,
+          }}
+        >
+          <Text style={{ color: "#fff", textAlign: "center", fontWeight: "600" }}>
+            Create Fireblocks Vault
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Background Gradient */}
-      <LinearGradient
-        colors={["#001A13", "#003B28", "#017148ff"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
+      {isDarkMode && (
+        <>
+          <LinearGradient
+            colors={["#001A13", "#003B28", "#017148ff"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <LinearGradient
+            colors={["rgba(255,255,255,0.02)", "rgba(0,0,0,0.6)"]}
+            style={StyleSheet.absoluteFillObject}
+          />
+        </>
+      )}
 
-      {/* Navbar */}
       <Navbar title="Wallet" rightIcon="bell" />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 90, flexGrow: 1 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 90 }}>
         {/* Header */}
         <View style={styles.headerContainer}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <View style={styles.avatar}>
-              <Text style={{ color: "#fff", fontWeight: "bold" }}>{username.charAt(0)}</Text>
+            <View
+              style={[
+                styles.avatar,
+                { backgroundColor: isDarkMode ? "#04523C" : "#02af6a" },
+              ]}
+            >
+              <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                {user?.name ? user.name.charAt(0) : "U"}
+              </Text>
             </View>
             <View style={{ marginLeft: 10 }}>
-              <Text style={styles.welcomeText}>Welcome back!</Text>
-              <Text style={styles.userName}>{username}</Text>
+              <Text style={[styles.welcomeText, { color: isDarkMode ? "#fff" : "#000" }]}>
+                Welcome back!
+              </Text>
+              <Text style={[styles.userName, { color: isDarkMode ? "#aaa" : "#666" }]}>
+                {user?.name || "User"}
+              </Text>
             </View>
           </View>
         </View>
@@ -235,63 +384,102 @@ export default function WalletInterface() {
         <View style={styles.centerWrapper}>
           <View style={styles.arcContainer}>
             <LinearGradient
-              colors={["#99c59d", "#309a5d", "#04523C"]}
+              colors={
+                isDarkMode
+                  ? ["#99c59d", "#309a5d", "#04523C"]
+                  : ["#e6fff5", "#a8e6cf", "#02af6a"]
+              }
               start={{ x: 0.5, y: 0 }}
               end={{ x: 0.5, y: 1 }}
               style={styles.gradientFullCircle}
             />
-            <View style={styles.arcMask} />
-            <View style={styles.innerCircle}>
+            <View
+              style={[
+                styles.arcMask,
+                { backgroundColor: isDarkMode ? "#001A13" : "#FFFFFF" },
+              ]}
+            />
+            <View
+              style={[
+                styles.innerCircle,
+                { backgroundColor: isDarkMode ? "#001A13" : "#FFFFFF" },
+              ]}
+            >
               <View style={styles.innerCircleContent}>
-                <Text style={styles.balanceLabel}>Total Balance</Text>
-                <Text style={styles.balanceValue}>${totalBalance.toLocaleString()}</Text>
+                <Text
+                  style={[styles.balanceLabel, { color: isDarkMode ? "#9ca3af" : "#666" }]}
+                >
+                  Total Balance
+                </Text>
+                <Text
+                  style={[styles.balanceValue, { color: isDarkMode ? "#fff" : "#000" }]}
+                >
+                  ₹{totalBalance.toLocaleString()}
+                </Text>
               </View>
             </View>
           </View>
         </View>
 
-        {/* Quick Action Buttons */}
+        {/* Action Buttons */}
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => setSendModalVisible(true)}>
-            <View style={styles.actionIconCircle}>
-              <Icon name="arrow-up-right" size={20} color="#fff" />
-            </View>
-            <Text style={styles.actionButtonText}>Send</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={() => setReceiveModalVisible(true)}>
-            <View style={styles.actionIconCircle}>
-              <Icon name="arrow-down-left" size={20} color="#fff" />
-            </View>
-            <Text style={styles.actionButtonText}>Receive</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={() => setSwapModalVisible(true)}>
-            <View style={styles.actionIconCircle}>
-              <Icon name="shuffle" size={20} color="#fff" />
-            </View>
-            <Text style={styles.actionButtonText}>Swap</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={() => setDepositModalVisible(true)}>
-            <View style={styles.actionIconCircle}>
-              <Icon name="arrow-down-circle" size={20} color="#fff" />
-            </View>
-            <Text style={styles.actionButtonText}>Deposit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={() => setWithdrawModalVisible(true)}>
-            <View style={styles.actionIconCircle}>
-              <Icon name="arrow-up-circle" size={20} color="#fff" />
-            </View>
-            <Text style={styles.actionButtonText}>Withdraw</Text>
-          </TouchableOpacity>
+          {[
+            { icon: "arrow-up-right", label: "Send", onPress: () => navigation.navigate("SendScreen") },
+            { icon: "arrow-down-left", label: "Receive", onPress: () => navigation.navigate("ReceiveScreen") },
+            { icon: "arrow-down-circle", label: "Deposit", onPress: () => navigation.navigate("DepositScreen") },
+            { icon: "trending-down", label: "Withdraw", onPress: () => navigation.navigate("WithdrawScreen"), isMaterial: true },
+          ].map((action, idx) => (
+            <TouchableOpacity key={idx} style={styles.actionButton} onPress={action.onPress}>
+              <View
+                style={[
+                  styles.actionIconCircle,
+                  { backgroundColor: isDarkMode ? "#054536" : "#e6fff5" },
+                ]}
+              >
+                {action.isMaterial ? (
+                  <MaterialIcons
+                    name={action.icon}
+                    size={20}
+                    color={isDarkMode ? "#fff" : "#02af6a"}
+                  />
+                ) : (
+                  <Icon
+                    name={action.icon}
+                    size={20}
+                    color={isDarkMode ? "#fff" : "#02af6a"}
+                  />
+                )}
+              </View>
+              <Text
+                style={[styles.actionButtonText, { color: isDarkMode ? "#fff" : "#000" }]}
+              >
+                {action.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* Tabs */}
-        <View style={styles.tabBar}>
+        <View
+          style={[
+            styles.tabBar,
+            { borderBottomColor: isDarkMode ? "rgba(255,255,255,0.2)" : "#E0E0E0" },
+          ]}
+        >
           {["tokens", "history", "accounts"].map((tab) => (
             <TouchableOpacity key={tab} style={styles.tabButton} onPress={() => setActiveTab(tab)}>
-              <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+              <Text
+                style={[
+                  styles.tabText,
+                  { color: isDarkMode ? "#9ca3af" : "#666" },
+                  activeTab === tab && { color: isDarkMode ? "#fff" : "#000", fontWeight: "bold" },
+                ]}
+              >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </Text>
-              {activeTab === tab && <View style={styles.tabUnderline} />}
+              {activeTab === tab && (
+                <View style={[styles.tabUnderline, { backgroundColor: isDarkMode ? "#04523C" : "#02af6a" }]} />
+              )}
             </TouchableOpacity>
           ))}
         </View>
@@ -301,272 +489,117 @@ export default function WalletInterface() {
         {activeTab === "accounts" && renderAccounts()}
       </ScrollView>
 
-      {/* Send Modal */}
-      <Modal visible={sendModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { width: "98%" }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "stretch" }}>
-              <TouchableOpacity onPress={() => setSendModalVisible(false)}>
-                <Icon name="arrow-left" size={24} color="#04523C" />
-              </TouchableOpacity>
-              <Text style={[styles.modalTitle, { flex: 1, textAlign: "center", marginLeft: -24 }]}>Send Token</Text>
-            </View>
-            <TextInput placeholder="Recipient Address" style={styles.input} multiline numberOfLines={2} />
-            <TextInput placeholder="Amount" style={styles.input} keyboardType="decimal-pad" />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-                <Text style={styles.buttonText}>Send</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Receive Modal */}
-      <Modal visible={receiveModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { width: "98%" }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "stretch" }}>
-              <TouchableOpacity onPress={() => setReceiveModalVisible(false)}>
-                <Icon name="arrow-left" size={24} color="#04523C" />
-              </TouchableOpacity>
-              <Text style={[styles.modalTitle, { flex: 1, textAlign: "center", marginLeft: -24 }]}>Receive Token</Text>
-            </View>
-            <View style={styles.qrPlaceholder}>
-              <MaterialIcons name="qr-code" size={80} color="#04523C" />
-            </View>
-            <Text style={styles.addressText} onPress={() => copyToClipboard(selectedWallet?.address)}>
-              {selectedWallet?.address}
-            </Text>
-            <TouchableOpacity style={styles.copyButton} onPress={() => copyToClipboard(selectedWallet?.address)}>
-              <Text style={styles.copyButtonText}>Copy Address</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Swap Modal */}
-      <Modal visible={swapModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { width: "98%" }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "stretch" }}>
-              <TouchableOpacity onPress={() => setSwapModalVisible(false)}>
-                <Icon name="arrow-left" size={24} color="#04523C" />
-              </TouchableOpacity>
-              <Text style={[styles.modalTitle, { flex: 1, textAlign: "center", marginLeft: -24 }]}>Swap Tokens</Text>
-            </View>
-            <TextInput placeholder="From (Select Token)" style={styles.input} />
-            <TextInput placeholder="To (Select Token)" style={styles.input} />
-            <TextInput placeholder="Amount" style={styles.input} keyboardType="decimal-pad" />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.sendButton} onPress={handleSwap}>
-                <Text style={styles.buttonText}>Swap</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Deposit Modal */}
-      <Modal visible={depositModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { width: "98%" }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "stretch" }}>
-              <TouchableOpacity onPress={() => setDepositModalVisible(false)}>
-                <Icon name="arrow-left" size={24} color="#04523C" />
-              </TouchableOpacity>
-              <Text style={[styles.modalTitle, { flex: 1, textAlign: "center", marginLeft: -24 }]}>Deposit</Text>
-            </View>
-            <Text style={{ color: "#333", marginBottom: 10, textAlign: "center" }}>
-              Deposit crypto or fiat funds to your selected wallet.
-            </Text>
-            <TextInput placeholder="Deposit Amount" style={styles.input} keyboardType="decimal-pad" />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.sendButton} onPress={handleDeposit}>
-                <Text style={styles.buttonText}>Deposit</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Withdraw Modal */}
-      <Modal visible={withdrawModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { width: "98%" }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", alignSelf: "stretch" }}>
-              <TouchableOpacity onPress={() => setWithdrawModalVisible(false)}>
-                <Icon name="arrow-left" size={24} color="#04523C" />
-              </TouchableOpacity>
-              <Text style={[styles.modalTitle, { flex: 1, textAlign: "center", marginLeft: -24 }]}>Withdraw</Text>
-            </View>
-            <Text style={{ color: "#333", marginBottom: 10, textAlign: "center" }}>
-              Withdraw your crypto or fiat funds from your wallet.
-            </Text>
-            <TextInput placeholder="Recipient Address" style={styles.input} />
-            <TextInput placeholder="Amount" style={styles.input} keyboardType="decimal-pad" />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.sendButton} onPress={handleWithdraw}>
-                <Text style={styles.buttonText}>Withdraw</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Bottom Navigation */}
       <BottomNav active="wallet" />
     </View>
   );
 }
-
-// ...styles unchanged (keep your existing styles block)...
-
-
-// ---------------- Styles ----------------
+// ---------------- Styles — PRESERVED YOUR DARK THEME, ADDED LIGHT THEME ----------------
 const styles = StyleSheet.create({
-  headerContainer: { paddingHorizontal: 10, paddingTop: Platform.OS === "android" ? 20 : 40, paddingBottom: 10 },
-  welcomeText: { fontSize: 16, fontWeight: "600", color: "#fff", marginTop: 80 },
-  userName: { fontSize: 15, fontWeight: "bold", color: "#aaa" },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#04523C", justifyContent: "center", alignItems: "center", marginTop: 80 },
+  headerContainer: {
+    paddingHorizontal: 10,
+    paddingTop: Platform.OS === "android" ? 20 : 40,
+    paddingBottom: 10,
+  },
+  welcomeText: { fontSize: 16, fontWeight: "600", marginTop: 80 },
+  userName: { fontSize: 15, fontWeight: "bold" },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop:80,
+  },
   centerWrapper: { alignItems: "center", marginVertical: 20 },
-  arcContainer: { width: 200, height: 200, borderRadius: 100, justifyContent: "center", alignItems: "center", position: "relative", transform: [{ rotate: "80deg" }] },
+  arcContainer: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+    transform: [{ rotate: "80deg" }],
+  },
   gradientFullCircle: { width: 200, height: 200, borderRadius: 100 },
-  arcMask: { position: "absolute", width: 100, height: 100, bottom: 0, left: 0, backgroundColor: "#001A13", borderBottomLeftRadius: 100 },
-  innerCircle: { position: "absolute", width: 140, height: 140, backgroundColor: "#001A13", borderRadius: 70, justifyContent: "center", alignItems: "center", transform: [{ rotate: "-80deg" }] },
+  arcMask: {
+    position: "absolute",
+    width: 100,
+    height: 100,
+    bottom: 0,
+    left: 0,
+    borderBottomLeftRadius: 100,
+  },
+  innerCircle: {
+    position: "absolute",
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    justifyContent: "center",
+    alignItems: "center",
+    transform: [{ rotate: "-80deg" }],
+  },
   innerCircleContent: { justifyContent: "center", alignItems: "center" },
-  balanceLabel: { fontSize: 12, color: "#9ca3af", marginBottom: 4 },
-  balanceValue: { fontSize: 18, color: "#fff", fontWeight: "bold" },
-  actionRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-around", marginVertical: 15, paddingHorizontal: 10 },
+  balanceLabel: { fontSize: 12, marginBottom: 4 },
+  balanceValue: { fontSize: 18, fontWeight: "bold" },
+  actionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-around",
+    marginVertical: 15,
+    paddingHorizontal: 10,
+  },
   actionButton: { alignItems: "center", margin: 8 },
-
-
   actionIconCircle: {
     width: 55,
     height: 55,
     borderRadius: 28,
-    backgroundColor: "#054536",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 5,
   },
-  actionButtonText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-  },
+  actionButtonText: { fontSize: 12, fontWeight: "600" },
   tabBar: {
     flexDirection: "row",
     justifyContent: "space-around",
     marginHorizontal: 20,
     marginTop: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.2)",
   },
-  tabButton: {
-    alignItems: "center",
-    paddingVertical: 10,
-    flex: 1,
-  },
-  tabText: {
-    color: "#9ca3af",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  activeTabText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  tabUnderline: {
-    height: 3,
-    backgroundColor: "#04523C",
-    width: "50%",
-  },
+  tabButton: { alignItems: "center", paddingVertical: 10, flex: 1 },
+  tabText: { fontSize: 14, fontWeight: "600" },
+  tabUnderline: { height: 3, width: "50%", borderRadius: 2 },
   section: {
     marginHorizontal: 15,
     marginVertical: 10,
-    backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 12,
     padding: 15,
   },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#fff",
-  },
-  addButton: {
-    backgroundColor: "#04523C",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    color: "#fff",
-    fontSize: 12,
-    overflow: "hidden",
-  },
-  addTokenForm: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  input: {
-    backgroundColor: "#fff",
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 10,
-    fontSize: 14,
-  },
+  sectionTitle: { fontSize: 18, fontWeight: "bold" },
   tokenRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.1)",
   },
   tokenIcon: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: "#04523C",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
   },
-  tokenName: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  tokenSymbol: {
-    color: "#9ca3af",
-    fontSize: 12,
-  },
-  tokenValues: {
-    alignItems: "flex-end",
-  },
-  tokenPrice: {
-    color: "#fff",
-    fontSize: 14,
-  },
-  tokenAmount: {
-    color: "#9ca3af",
-    fontSize: 12,
-  },
-  tokenTotal: {
-    color: "#10b981",
-    fontWeight: "bold",
-  },
+  tokenName: { fontWeight: "600" },
+  tokenSymbol: { fontSize: 12 },
+  tokenValues: { alignItems: "flex-end" },
+  tokenPrice: { fontSize: 14 },
+  tokenAmount: { fontSize: 12 },
+  tokenTotal: { fontWeight: "bold" },
   historyItem: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.1)",
   },
   historyIcon: {
     width: 36,
@@ -576,200 +609,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 10,
   },
-  historyToken: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  historyDate: {
-    color: "#9ca3af",
-    fontSize: 12,
-  },
-  historyStatus: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  txId: {
-    color: "#60a5fa",
-    fontSize: 11,
-  },
+  historyToken: { fontWeight: "600" },
+  historyDate: { fontSize: 12 },
+  historyStatus: { fontSize: 12, fontWeight: "600" },
+  txId: { fontSize: 11 },
   walletItem: {
-    padding: 12,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderRadius: 8,
-    marginBottom: 8,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  selectedWallet: {
-    borderColor: "#04523C",
-    borderWidth: 1,
-  },
-  walletName: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  walletAddress: {
-    color: "#9ca3af",
-    fontSize: 12,
-    maxWidth: 180,
-  },
-  walletBalance: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  actionButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 10,
-  },
-  actionBtn: {
-    flexDirection: "row",
-    backgroundColor: "#04523C",
-    padding: 10,
-    borderRadius: 8,
-    alignItems: "center",
-    flex: 1,
-    marginHorizontal: 5,
-    justifyContent: "center",
-  },
-  actionBtnText: {
-    color: "#fff",
-    marginLeft: 5,
-    fontSize: 12,
-  },
-  settingRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 12,
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.1)",
-  },
-  settingLabel: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  settingDesc: {
-    color: "#9ca3af",
-    fontSize: 12,
-  },
-  toggle: {
-    width: 44,
-    height: 24,
-    borderRadius: 12,
-  },
-  toggleTrack: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#6b7280",
-    backgroundColor: "#374151",
-    justifyContent: "center",
-  },
-  toggleActive: {
-    backgroundColor: "#04523C",
-    borderColor: "#04523C",
-  },
-  toggleThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#fff",
-    margin: 2,
-  },
-  backupButton: {
-    marginTop: 15,
     flexDirection: "row",
-    backgroundColor: "#dc2626",
-    padding: 12,
-    borderRadius: 8,
-    justifyContent: "center",
-  },
-  backupText: {
-    color: "#fff",
-    fontWeight: "bold",
-    marginLeft: 8,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    justifyContent: "center",
+    justifyContent: "space-between",
     alignItems: "center",
   },
-  modalContent: {
-    backgroundColor: "#fff",
-    padding: 20,
-    borderRadius: 16,
-    alignItems: "center",
-    width: "90%",
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 15,
-    color: "#000",
-  },
-  modalButtons: {
-    flexDirection: "row",
-    marginTop: 20,
-    width: "100%",
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: "#d1d5db",
-    padding: 12,
-    borderRadius: 8,
-    marginRight: 10,
-    alignItems: "center",
-  },
-  sendButton: {
-    flex: 1,
-    backgroundColor: "#04523C",
-    padding: 12,
-    borderRadius: 8,
-    marginLeft: 10,
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  addressText: {
-    marginVertical: 10,
-    fontSize: 12,
-    color: "#000",
-    textAlign: "center",
-    maxWidth: "100%",
-  },
-  copyButton: {
-    backgroundColor: "#3b82f6",
-    padding: 10,
-    borderRadius: 8,
-    marginVertical: 10,
-    width: "80%",
-  },
-  copyButtonText: {
-    color: "#fff",
-    textAlign: "center",
-  },
-  closeButton: {
-    marginTop: 10,
-    padding: 10,
-  },
-  closeText: {
-    color: "#6b7280",
-  },
-  qrPlaceholder: {
-    width: 120,
-    height: 120,
-    backgroundColor: "#f0fdf4",
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 12,
-    marginVertical: 15,
-    borderWidth: 1,
-    borderColor: "#a7f3d0",
-  },
+  walletName: { fontWeight: "600" },
+  walletAddress: { fontSize: 12, maxWidth: 180 },
+  walletBalance: { fontWeight: "bold" },
 });
-

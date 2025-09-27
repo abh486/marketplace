@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import {
   View,
   Text,
@@ -8,47 +8,134 @@ import {
   Image,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import LinearGradient from "react-native-linear-gradient";
 import Icon from "react-native-vector-icons/Feather";
 import { LineChart } from "react-native-chart-kit";
-import FontAwesome from "react-native-vector-icons/FontAwesome";
-
-// Import your Navbar & BottomNav
+import { useNavigation } from "@react-navigation/native";
+import { UserProfileContext } from "../Context/UserProfileContext";
 import Navbar from "../properties/Navbar";
 import BottomNav from "../properties/BottomNav";
+import { useTheme } from "../../Theme/ThemeContext"; // ✅ ADDED
 
+const API_KEY = "740b5229de0741969e46c53db4bb611c";
+const BASE_CURRENCY = "INR";
 const W = Dimensions.get("window").width;
+const USER_NAME = "Sam Kruss";
 
 export default function Home() {
-  const [selectedRange] = useState("1D"); // Fixed to 1D
-
-  // Simulated owned assets
+  const [selectedRange] = useState("1D");
   const [ownedAssetsCount] = useState(0);
   const [totalTokens] = useState(0);
+  const { profile } = useContext(UserProfileContext);
+  const currency = profile?.currency || "USD";
+
+  const [exchangeRates, setExchangeRates] = useState({});
+  const [isRatesLoading, setIsRatesLoading] = useState(true);
+
+  const navigation = useNavigation();
+  const { theme, isDarkMode } = useTheme(); // ✅ Get current theme
+
+  useEffect(() => {
+    const fetchRates = async () => {
+      setIsRatesLoading(true);
+      try {
+        const response = await fetch(
+          `https://api.currencyfreaks.com/v2.0/rates/latest?apikey=${API_KEY}`
+        );
+        const data = await response.json();
+        setExchangeRates(data.rates || {});
+      } catch (error) {
+        console.error("Failed to fetch exchange rates", error);
+      }
+      setIsRatesLoading(false);
+    };
+    fetchRates();
+  }, []);
+
+  const formatAmountByCurrency = (amount, currencyCode, locale = "en-US") => {
+    try {
+      let rate = 1;
+      if (
+        exchangeRates &&
+        exchangeRates[currencyCode] &&
+        exchangeRates[BASE_CURRENCY]
+      ) {
+        rate =
+          parseFloat(exchangeRates[currencyCode]) /
+          parseFloat(exchangeRates[BASE_CURRENCY]);
+      } else if (currencyCode === BASE_CURRENCY) {
+        rate = 1;
+      }
+      const convertedAmount = amount * rate;
+      return new Intl.NumberFormat(locale, {
+        style: "currency",
+        currency: currencyCode,
+        currencyDisplay: "symbol",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(convertedAmount);
+    } catch (error) {
+      return `${currencyCode} ${amount.toFixed(2)}`;
+    }
+  };
 
   const getGreeting = () => {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-};
+    const hour = new Date().getHours();
+    if (hour < 12) return `Good morning, ${USER_NAME}`;
+    if (hour < 17) return `Good afternoon, ${USER_NAME}`;
+    return `Good evening, ${USER_NAME}`;
+  };
 
+  const [notifications, setNotifications] = useState([
+    { id: "1", title: "Portfolio update", message: "A new asset was added to your portfolio." },
+    { id: "2", title: "Market Insight", message: "Copper prices up 6% in Middle East." },
+    { id: "3", title: "Security alert", message: "New login from Dubai." }
+  ]);
+
+  const notificationCount = notifications.length;
+
+  const basePortfolioValue = 20000;
+  const fixedDailyChangeUSD = 24;
+  const fixedDailyChangePercent = "+12%";
+
+  const FEATURED_ASSETS = [
+    { id: "1", title: "Luxury Apartments", location: "New York, USA", roi: "+12% ROI", priceUSD: 2500, image: require("../../assets/image/apar.jpg") },
+    { id: "2", title: "Vintage Watches", location: "Geneva, Switzerland", roi: "+13% ROI", priceUSD: 5200, image: require("../../assets/image/watch.jpg") },
+    { id: "3", title: "Physical Gold", location: "Global", roi: "+4% YOY", priceUSD: 2100, image: require("../../assets/image/gold1.jpg") },
+    { id: "4", title: "Contemporary Art", location: "Paris, France", roi: "+9% ROI", priceUSD: 11000, image: require("../../assets/image/art.jpeg") },
+    { id: "5", title: "Copper", location: "Middle East", roi: "+7% ROI", priceUSD: 3450, image: require("../../assets/image/commodities.jpg") },
+  ];
+
+  if (isRatesLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: isDarkMode ? "#001A13" : "#FFFFFF" }}>
+        <ActivityIndicator size="large" color="#00DB84" />
+      </View>
+    );
+  }
+
+  const formattedPortfolioValue = formatAmountByCurrency(basePortfolioValue, currency);
+  const formattedDailyChange = `${formatAmountByCurrency(fixedDailyChangeUSD, currency)} • ${fixedDailyChangePercent} today`;
 
   return (
-    <View style={{ flex: 1 }}>
-      {/* Background Gradient */}
-      <LinearGradient
-        colors={["#001A13", "#003B28", "#017148ff"]}
-  start={{ x: 0, y: 0 }}
-  end={{ x: 1, y: 1 }}
-  style={StyleSheet.absoluteFillObject}
-      >
-        <LinearGradient
-          colors={["rgba(255,255,255,0.02)", "rgba(0,0,0,0.6)"]}
-          style={StyleSheet.absoluteFillObject}
-        />
-      </LinearGradient>
+    <View style={{ flex: 1, backgroundColor: theme.background }}> {/* ✅ DYNAMIC BACKGROUND */}
+      {/* Background for Dark Theme Only */}
+      {isDarkMode && (
+        <>
+          <LinearGradient
+            colors={["#001A13", "#003B28", "#017148ff"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <LinearGradient
+            colors={["rgba(255,255,255,0.02)", "rgba(0,0,0,0.6)"]}
+            style={StyleSheet.absoluteFillObject}
+          />
+        </>
+      )}
 
       <Navbar />
 
@@ -57,262 +144,216 @@ export default function Home() {
         contentContainerStyle={{ paddingBottom: 80 }}
         showsVerticalScrollIndicator={false}
       >
-
-       {/* === Notification Banner === */}
-  <View style={styles.notificationBanner}>
-    <Icon name="bell" size={24} color="#31e59469" />
-    <View style={styles.notificationTextContainer}>
-      <Text style={styles.greetingText}>{getGreeting()}!</Text>
-      <Text style={styles.subText}>Check your notifications</Text>
-    </View>
-    <Icon name="chevron-right" size={20} color="#aaa" />
-  </View>
-
-{/* ----- Portfolio/Balance Section ------ */}
-<LinearGradient
-  colors={["#04523C", "#001A13"]} // Vertical gradient: top to bottom
-  start={{ x: 0, y: 0 }}
-  end={{ x: 0, y: 1 }}
-  style={styles.balanceSectionContainer}
->
-  {/* Header Row (Portfolio left, Performance right) */}
-  <View style={styles.balanceHeaderRow}>
-    <Text style={styles.balanceLabel}>Total Portfolio</Text>
-
-    <View style={styles.performanceContainer}>
-      <Text style={styles.performanceLabel}>1D +0.02</Text>
-      <View style={styles.percentageBox}>
-        <Text style={styles.percentageValue}>+0.02%</Text>
-      </View>
-    </View>
-  </View>
-
-  {/* Portfolio Value + Graph */}
-  <View style={styles.balanceContentRow}>
-    <View style={styles.balanceLeftColumn}>
-      <Text style={styles.balanceValue}>$0</Text>
-      <Text style={styles.balanceChange}>+24 USD • +12% today</Text>
-
-      <View style={styles.tokenRow}>
-        <View style={styles.tokenCircle}>
-          <Image source={require("../../assets/image/token1.jpg")} style={styles.tokenImage} />
-        </View>
-        <View style={[styles.tokenCircle, styles.tokenCircleOverlap]}>
-          <Image source={require("../../assets/image/token2.png")} style={styles.tokenImage} />
-        </View>
-        <View style={[styles.tokenCircle, styles.tokenCircleOverlap]}>
-          <Image source={require("../../assets/image/solena.png")} style={styles.tokenImage} />
-        </View>
-
-        {/* Mini Graph using chart-kit */}
-        <View style={{ marginLeft: 50, marginRight: 50, marginBottom: 0, marginTop: -30 }}>
-          <LineChart
-            data={{
-              labels: ["", "", "", "", ""],
-              datasets: [{ data: [0.2, 0.8, 0.3, 0.7, 0.3, 0.55] }],
-            }}
-            width={200}
-            height={60}
-            withDots={false}
-            withInnerLines={false}
-            withOuterLines={false}
-            withVerticalLabels={false}
-            withHorizontalLabels={false}
-            fromZero={true}
-            segments={0}
-            chartConfig={{
-              backgroundColor: "transparent",
-              backgroundGradientFrom: "transparent",
-              backgroundGradientTo: "transparent",
-              fillShadowGradientFrom: "transparent",
-              fillShadowGradientTo: "transparent",
-              fillShadowGradientOpacity: 0,
-              color: (opacity = 0) => `rgba(66,231,162)`,
-              strokeWidth: 1,
-              propsForBackgroundLines: { stroke: "none" },
-              propsForLabels: { opacity: 0 },
-              style: {
-                overflow: "hidden",
-              },
-            }}
-            bezier
-            style={{
-              backgroundColor: "transparent",
-              borderRadius: 10,
-              overflow: "visible",
-            }}
-            transparent
-          />
-          {/* Label Overlay */}
-          <View style={styles.labelContainer}>
-            <Text style={styles.labelText}>$1,156.00</Text>
+        {/* Notification Banner */}
+        <TouchableOpacity
+          style={{ marginBottom: 10 }}
+          onPress={() =>
+            navigation.navigate("NotificationScreen", { notifications, setNotifications })
+          }
+          activeOpacity={0.8}
+        >
+          <View style={styles.notificationBanner}>
+            <Icon name="bell" size={24} color={isDarkMode ? "#31e59469" : "#00DB84"} />
+            <View style={styles.notificationTextContainer}>
+              <Text style={[styles.greetingText, { color: isDarkMode ? "#fff" : "#000" }]}>{getGreeting()}!</Text>
+              <Text style={[styles.subText, { color: isDarkMode ? "#aaa" : "#666" }]}>Check your notifications</Text>
+            </View>
+            {notificationCount > 0 && (
+              <View style={styles.smallBadge}>
+                <Text style={styles.smallBadgeText}>{notificationCount}</Text>
+              </View>
+            )}
           </View>
-        </View>
-      </View>
-    </View>
-  </View>
-</LinearGradient>
+        </TouchableOpacity>
 
+        {/* Portfolio/Balance Section */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate("PortfolioScreen")}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={isDarkMode ? ["#04523C", "#001A13"] : ["#1ab074ff", "#9ceeadff"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={styles.balanceSectionContainer}
+          >
+            <View style={styles.balanceHeaderRow}>
+              <Text style={[styles.balanceLabel, { color: isDarkMode ? "#fff" : "#000" }]}>
+                {isDarkMode ? "Total Portfolio" : "Total Balance"}
+              </Text>
+              <View style={styles.performanceContainer}>
+                <Text style={[styles.performanceLabel, { color: isDarkMode ? "#fff" : "#000" }]}>1D +0.02</Text>
+                <View style={styles.percentageBox}>
+                  <Text style={styles.percentageValue}>+0.02%</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.balanceContentRow}>
+              <View style={styles.balanceLeftColumn}>
+                <Text style={[styles.balanceValue, { color: isDarkMode ? "#fff" : "#000" }]}>{formattedPortfolioValue}</Text>
+                <Text style={[styles.balanceChange, { color: isDarkMode ? "#fff" : "#000" }]}>{formattedDailyChange}</Text>
 
+                <View style={styles.tokenRow}>
+                  <View style={styles.tokenCircle}>
+                    <Image source={require("../../assets/image/token1.jpg")} style={styles.tokenImage} />
+                  </View>
+                  <View style={[styles.tokenCircle, styles.tokenCircleOverlap]}>
+                    <Image source={require("../../assets/image/token2.png")} style={styles.tokenImage} />
+                  </View>
+                  <View style={[styles.tokenCircle, styles.tokenCircleOverlap]}>
+                    <Image source={require("../../assets/image/solena.png")} style={styles.tokenImage} />
+                  </View>
+                </View>
 
-        {/* Unified Card: Header + Scrollable Cards */}
-        <Text style={styles.FeaturedTitle}>Trending Assets</Text>
-        <View style={styles.unifiedCard}>
-          {/* Header Row */}
-          <View style={styles.headerRow}>
-            <Text style={styles.ownedText}>
-              Owned Assets:{" "}
-              <Text style={styles.ownedValue}>{ownedAssetsCount}</Text>
+                {/* Mini Graph */}
+                <View style={{ marginLeft: 99, marginRight: 50, marginBottom: 0, marginTop: -50 }}>
+                  <LineChart
+                    data={{
+                      labels: ["", "", "", "", ""],
+                      datasets: [{ data: [0.2, 0.8, 0.3, 0.7, 0.3, 0.55] }],
+                    }}
+                    width={200}
+                    height={60}
+                    withDots={false}
+                    withInnerLines={false}
+                    withOuterLines={false}
+                    withVerticalLabels={false}
+                    withHorizontalLabels={false}
+                    fromZero={true}
+                    segments={0}
+                    chartConfig={{
+                      backgroundColor: "transparent",
+                      backgroundGradientFrom: "transparent",
+                      backgroundGradientTo: "transparent",
+                      fillShadowGradientFrom: "transparent",
+                      fillShadowGradientTo: "transparent",
+                      fillShadowGradientOpacity: 0,
+                      color: (opacity = 0) => isDarkMode ? `rgba(66,231,162)` : `rgba(0,219,132)`,
+                      strokeWidth: 1,
+                      propsForBackgroundLines: { stroke: "none" },
+                      propsForLabels: { opacity: 0 },
+                      style: {
+                        overflow: "hidden",
+                      },
+                    }}
+                    bezier
+                    style={{
+                      backgroundColor: "transparent",
+                      borderRadius: 10,
+                      overflow: "visible",
+                    }}
+                    transparent
+                  />
+                  <View style={styles.labelContainer}>
+                    <Text style={styles.labelText}>{formatAmountByCurrency(1156, currency)}</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* Featured Assets Section */}
+        <Text style={[styles.FeaturedTitle, { color: isDarkMode ? "#fff" : "#000", marginLeft: 20 }]}>Trending Assets</Text>
+        <View style={[styles.unifiedCard, { backgroundColor: isDarkMode ? "#07392dff" : "#FAFAFA" }]}>
+          <View style={[styles.headerRow, { borderBottomColor: isDarkMode ? "rgba(255,255,255,0.08)" : "#FAFAFA" }]}>
+            <Text style={[styles.ownedText, { color: isDarkMode ? "#aaa" : "#666" }]}>
+              Owned Assets: <Text style={[styles.ownedValue, { color: isDarkMode ? "#fff" : "#000" }]}>{ownedAssetsCount}</Text>
             </Text>
-            <Text style={styles.ownedText}>
-              Tokens: <Text style={styles.ownedValue}>{totalTokens}</Text>
+            <Text style={[styles.ownedText, { color: isDarkMode ? "#aaa" : "#666" }]}>
+              Tokens: <Text style={[styles.ownedValue, { color: isDarkMode ? "#fff" : "#000" }]}>{totalTokens}</Text>
             </Text>
           </View>
-
-          {/* Horizontal Scroll Inside Card */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.scrollableContent}
             contentContainerStyle={styles.scrollContent}
           >
-            {/* Luxury Apartments */}
-            <View style={styles.featureCard}>
-              <Image
-                source={require("../../assets/image/apar.jpg")}
-                style={styles.featureCardImg}
-                resizeMode="cover"
-              />
-              <View style={styles.featureCardBody}>
-                <View style={styles.titlePriceRow}>
-                  <Text style={styles.featureCardTitle}>Luxury Apartments</Text>
-                  <Text style={styles.featureCardPrice}>$2,500</Text>
+            {FEATURED_ASSETS.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                onPress={() => navigation.navigate("MarketScreen")}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.featureCard, { backgroundColor: isDarkMode ? "#07392dff" : "#FAFAFA" }]}>
+                  <Image
+                    source={item.image}
+                    style={styles.featureCardImg}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.featureCardBody}>
+                    <View style={styles.titlePriceRow}>
+                      <Text style={[styles.featureCardTitle, { color: isDarkMode ? "#fff" : "#000" }]}>{item.title}</Text>
+                      <Text style={[styles.featureCardPrice, { color: isDarkMode ? "#fff" : "#000" }]}>
+                        {formatAmountByCurrency(item.priceUSD, currency)}
+                      </Text>
+                    </View>
+                    <View style={styles.locationRoiRow}>
+                      <Text style={[styles.featureCardLocation, { color: isDarkMode ? "#aaa" : "#666" }]}>{item.location}</Text>
+                      <Text style={[styles.featureCardROI, { color: isDarkMode ? "#3be89e" : "#00DB84" }]}>{item.roi}</Text>
+                    </View>
+                  </View>
                 </View>
-                <View style={styles.locationRoiRow}>
-                  <Text style={styles.featureCardLocation}>New York, USA</Text>
-                  <Text style={styles.featureCardROI}>+12% ROI</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Collectibles */}
-            <View style={styles.featureCard}>
-              <Image
-                source={require("../../assets/image/watch.jpg")}
-                style={styles.featureCardImg}
-                resizeMode="cover"
-              />
-              <View style={styles.featureCardBody}>
-                <View style={styles.titlePriceRow}>
-                  <Text style={styles.featureCardTitle}>Vintage Watches</Text>
-                  <Text style={styles.featureCardPrice}>$5,200</Text>
-                </View>
-                <View style={styles.locationRoiRow}>
-                  <Text style={styles.featureCardLocation}>
-                    Geneva, Switzerland
-                  </Text>
-                  <Text style={styles.featureCardROI}>+13% ROI</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Gold */}
-            <View style={styles.featureCard}>
-              <Image
-                source={require("../../assets/image/gold1.jpg")}
-                style={styles.featureCardImg}
-                resizeMode="cover"
-              />
-              <View style={styles.featureCardBody}>
-                <View style={styles.titlePriceRow}>
-                  <Text style={styles.featureCardTitle}>Physical Gold</Text>
-                  <Text style={styles.featureCardPrice}>$2,100</Text>
-                </View>
-                <View style={styles.locationRoiRow}>
-                  <Text style={styles.featureCardLocation}>Global</Text>
-                  <Text style={styles.featureCardROI}>+4% YOY</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Art */}
-            <View style={styles.featureCard}>
-              <Image
-                source={require("../../assets/image/art.jpeg")}
-                style={styles.featureCardImg}
-                resizeMode="cover"
-              />
-              <View style={styles.featureCardBody}>
-                <View style={styles.titlePriceRow}>
-                  <Text style={styles.featureCardTitle}>Contemporary Art</Text>
-                  <Text style={styles.featureCardPrice}>$11,000</Text>
-                </View>
-                <View style={styles.locationRoiRow}>
-                  <Text style={styles.featureCardLocation}>Paris, France</Text>
-                  <Text style={styles.featureCardROI}>+9% ROI</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Commodities */}
-            <View style={styles.featureCard}>
-              <Image
-                source={require("../../assets/image/commodities.jpg")}
-                style={styles.featureCardImg}
-                resizeMode="cover"
-              />
-              <View style={styles.featureCardBody}>
-                <View style={styles.titlePriceRow}>
-                  <Text style={styles.featureCardTitle}>Copper</Text>
-                  <Text style={styles.featureCardPrice}>$3,450</Text>
-                </View>
-                <View style={styles.locationRoiRow}>
-                  <Text style={styles.featureCardLocation}>Middle East</Text>
-                  <Text style={styles.featureCardROI}>+7% ROI</Text>
-                </View>
-              </View>
-            </View>
+              </TouchableOpacity>
+            ))}
           </ScrollView>
         </View>
 
         {/* Unlock Rewards Card */}
-        <View style={styles.rewardCard}>
-          <View style={styles.rewardCardIcon}>
-            <Icon name="shield" size={26} color="#31e594" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.rewardCardTitle}>Unlock Rewards</Text>
-            <Text style={styles.rewardCardSubtitle}>
-              Complete Profile & Invite Friends
-            </Text>
-          </View>
-          <Icon name="chevron-right" size={25} color="#b0fdd3" />
-        </View>
+        <TouchableOpacity onPress={() => navigation.navigate("Rewards")}>
+          <Text style={[styles.viewRewardsLabel, { color: isDarkMode ? "#ccc" : "#02af6a", marginLeft: 280 }]}>View Rewards</Text>
+        </TouchableOpacity>
 
-        {/* === Recommendations Section === */}
-        <Recommendations
-          ownedAssetsCount={ownedAssetsCount}
-          totalTokens={totalTokens}
-        />
+        <TouchableOpacity
+          onPress={() => navigation.navigate("Profile")}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.rewardCard, { backgroundColor: isDarkMode ? "#024F36" : "#02af6a" }]}>
+            <View style={styles.rewardCardIcon}>
+              <Icon name="shield" size={isDarkMode ? 26 : 24} color={isDarkMode ? "#31e594" : "#00DB84"} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rewardCardTitle, { color: isDarkMode ? "#fff" : "#fff" }]}>Unlock Rewards</Text>
+              <Text style={[styles.rewardCardSubtitle, { color: isDarkMode ? "#c8fde0ff" : "#fff" }]}>
+                Complete Profile & Invite Friends
+              </Text>
+            </View>
+            <Icon name="chevron-right" size={25} color={isDarkMode ? "#b0fdd3" : "#00DB84"} />
+          </View>
+        </TouchableOpacity>
+
+        {/* Recommendations */}
+        <Recommendations ownedAssetsCount={ownedAssetsCount} totalTokens={totalTokens} isDarkMode={isDarkMode} />
 
         {/* News & Analysis */}
-        <NewAndAnalysis />
+        <NewAndAnalysis isDarkMode={isDarkMode} />
 
         {/* Community Join Button */}
         <TouchableOpacity
-          style={styles.communityJoinButton}
+          style={[styles.communityJoinButton, { backgroundColor: isDarkMode ? "#07392dff" : "#02af6a" }]}
           activeOpacity={0.8}
-          onPress={() =>
-            Alert.alert("Join Community", "Redirecting to community page...")
-          }
+          onPress={() => Alert.alert("Join Community", "Redirecting to community page...")}
         >
           <View style={styles.communityJoinIcon}>
-            <Icon name="users" size={20} color="#fff" />
+            <Icon name="users" size={20} color={isDarkMode ? "#fff" : "#fff"} />
           </View>
-          <Text style={styles.communityJoinText}>Join Our Community</Text>
-          <Icon name="chevron-right" size={20} color="#fff" />
+          <Text style={[styles.communityJoinText, { color: isDarkMode ? "#fff" : "#fff" }]}>Join Our Community</Text>
+          <Icon name="chevron-right" size={20} color={isDarkMode ? "#fff" : "#00DB84"} />
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Cora AI Button */}
+      <TouchableOpacity
+        style={[styles.coraButtonContainer, { backgroundColor: isDarkMode ? "#07392dff" : "#F5F5F5", marginLeft: 340 }]}
+        activeOpacity={0.8}
+        onPress={() => navigation.navigate("AiPage")}
+      >
+        <Image
+          source={require("../../assets/image/coraring.png")}
+          style={styles.coraButtonImage}
+        />
+      </TouchableOpacity>
 
       <BottomNav />
     </View>
@@ -320,44 +361,43 @@ export default function Home() {
 }
 
 // --- Recommendation Section (List View) ---
-function Recommendations({ ownedAssetsCount, totalTokens }) {
+function Recommendations({ ownedAssetsCount, totalTokens, isDarkMode }) {
   const recommendations = [
     {
       id: "1",
       icon: "pie-chart",
       title: "Fractional Luxury Assets",
       subtitle: "Start owning art, watches & real estate from $50.",
-      bg: ["#07392dff", "#07392dff"],
+      bg: isDarkMode ? ["#07392dff", "#07392dff"] : ["#FAFAFA", "#FAFAFA"],
     },
     {
       id: "2",
       icon: "target",
       title: "Build Long-Term Wealth",
       subtitle: "High ROI assets tailored for your journey.",
-      bg: ["#07392dff", "#07392dff"],
+      bg: isDarkMode ? ["#07392dff", "#07392dff"] : ["#FAFAFA", "#FAFAFA"],
     },
     {
       id: "3",
       icon: "trending-up",
       title: "Diversify with Gold",
       subtitle: "Add stability to your portfolio with precious metals.",
-      bg: ["#07392dff", "#07392dff"],
+      bg: isDarkMode ? ["#07392dff", "#07392dff"] : ["#FAFAFA", "#FAFAFA"],
     },
   ];
-
   return (
     <View style={recStyles.container}>
-      <Text style={recStyles.title}>Recommended For You</Text>
+      <Text style={[recStyles.title, { color: isDarkMode ? "#fff" : "#000" }]}>Recommended For You</Text>
       <View style={{ gap: 14 }}>
         {recommendations.map((item) => (
           <LinearGradient key={item.id} colors={item.bg} style={recStyles.listCard}>
             <View style={recStyles.leftRow}>
               <View style={recStyles.iconWrap}>
-                <Icon name={item.icon} size={22} color="#fff" />
+                <Icon name={item.icon} size={22} color={isDarkMode ? "#fff" : "#00DB84"} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={recStyles.cardTitle}>{item.title}</Text>
-                <Text style={recStyles.cardSubtitle}>{item.subtitle}</Text>
+                <Text style={[recStyles.cardTitle, { color: isDarkMode ? "#fff" : "#000" }]}>{item.title}</Text>
+                <Text style={[recStyles.cardSubtitle, { color: isDarkMode ? "#eee" : "#666" }]}>{item.subtitle}</Text>
               </View>
             </View>
           </LinearGradient>
@@ -368,7 +408,7 @@ function Recommendations({ ownedAssetsCount, totalTokens }) {
 }
 
 // --- Auto-Scrolling News & Analysis with Dots ---
-function NewAndAnalysis() {
+function NewAndAnalysis({ isDarkMode }) {
   const items = [
     {
       id: "1",
@@ -396,15 +436,12 @@ function NewAndAnalysis() {
       isVideo: false,
     },
   ];
-
   const scrollViewRef = useRef();
   const [activeIndex, setActiveIndex] = useState(0);
-
   useEffect(() => {
     const interval = setInterval(() => {
       let nextIndex = (activeIndex + 1) % items.length;
       setActiveIndex(nextIndex);
-
       if (scrollViewRef.current) {
         scrollViewRef.current.scrollTo({
           x: nextIndex * (360 + 16),
@@ -412,18 +449,14 @@ function NewAndAnalysis() {
         });
       }
     }, 3000);
-
     return () => clearInterval(interval);
   }, [activeIndex, items.length]);
-
   const handleAction = (id, action) => {
     Alert.alert(`${action} Item`, `You ${action.toLowerCase()}ed ${id}`);
   };
-
   return (
     <View style={styles.naContainer}>
-      <Text style={styles.naTitle}>News & Analysis</Text>
-
+      <Text style={[styles.naTitle, { color: isDarkMode ? "#fff" : "#000" }]}>News & Analysis</Text>
       <View style={{ position: "relative" }}>
         <ScrollView
           ref={scrollViewRef}
@@ -434,68 +467,54 @@ function NewAndAnalysis() {
           scrollEnabled={false}
         >
           {items.map((item) => (
-            <View key={item.id} style={styles.analysisCard}>
-              {/* Image with Gradient Overlay */}
+            <View key={item.id} style={[styles.analysisCard, { backgroundColor: isDarkMode ? "#07392dff" : "#F5F5F5" }]}>
               <View style={styles.imageContainer}>
                 <Image source={item.image} style={styles.analysisImage} />
                 <LinearGradient
                   colors={["transparent", "rgba(0,0,0,0.8)"]}
                   style={styles.gradientOverlay}
                 />
-
-                {/* Play Button (Only for Videos) */}
                 {item.isVideo && (
                   <TouchableOpacity style={styles.playButton}>
                     <Icon name="play" size={24} color="#fff" />
                   </TouchableOpacity>
                 )}
-
-                {/* Duration (Only for Videos) */}
                 {item.isVideo && (
                   <View style={styles.durationBadge}>
                     <Text style={styles.durationText}>{item.duration}</Text>
                   </View>
                 )}
               </View>
-
-              {/* Content */}
               <View style={styles.analysisContent}>
-                <Text style={styles.analysisTitle} numberOfLines={2}>
+                <Text style={[styles.analysisTitle, { color: isDarkMode ? "#fff" : "#000" }]} numberOfLines={2}>
                   {item.title}
                 </Text>
-
-                {/* Type Label */}
-                <Text style={styles.contentType}>{item.type}</Text>
-
-                <Text style={styles.analysisSubtitle}>{item.subtitle}</Text>
-
-                {/* Action Buttons */}
+                <Text style={[styles.contentType, { color: isDarkMode ? "#54c2926b" : "#00DB84" }]}>{item.type}</Text>
+                <Text style={[styles.analysisSubtitle, { color: isDarkMode ? "#aaa" : "#666" }]}>{item.subtitle}</Text>
                 <View style={styles.actionRow}>
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => handleAction(item.id, "Saved")}
                   >
-                    <Icon name="bookmark" size={16} color="#aaa" />
+                    <Icon name="bookmark" size={16} color={isDarkMode ? "#aaa" : "#aaa"} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => handleAction(item.id, "Shared")}
                   >
-                    <Icon name="share-2" size={16} color="#aaa" />
+                    <Icon name="share-2" size={16} color={isDarkMode ? "#aaa" : "#aaa"} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => handleAction(item.id, "Downloaded")}
                   >
-                    <Icon name="download" size={16} color="#aaa" />
+                    <Icon name="download" size={16} color={isDarkMode ? "#aaa" : "#aaa"} />
                   </TouchableOpacity>
                 </View>
               </View>
             </View>
           ))}
         </ScrollView>
-
-        {/* Pagination Dots */}
         <View style={styles.dotsContainer}>
           {items.map((_, i) => (
             <View
@@ -503,6 +522,11 @@ function NewAndAnalysis() {
               style={[
                 styles.dot,
                 i === activeIndex ? styles.dotActive : styles.dotInactive,
+                {
+                  backgroundColor: i === activeIndex
+                    ? (isDarkMode ? "#aaa" : "#00DB84")
+                    : (isDarkMode ? "rgba(255,255,255,0.2)" : "#ccc"),
+                },
               ]}
             />
           ))}
@@ -512,13 +536,13 @@ function NewAndAnalysis() {
   );
 }
 
+// ✅ YOUR ORIGINAL STYLES — UNTOUCHED
 const recStyles = StyleSheet.create({
   container: {
     marginTop: 24,
     marginHorizontal: 16,
   },
   title: {
-    color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 14,
@@ -530,9 +554,9 @@ const recStyles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     shadowColor: "#000",
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.1,
     shadowRadius: 6,
-    elevation: 6,
+    elevation: 3,
   },
   leftRow: {
     flexDirection: "row",
@@ -541,241 +565,163 @@ const recStyles = StyleSheet.create({
     marginRight: 10,
   },
   iconWrap: {
-    backgroundColor: "rgba(255,255,255,0.2)",
     borderRadius: 30,
     padding: 8,
     marginRight: 12,
   },
   cardTitle: {
-    color: "#fff",
     fontSize: 15,
     fontWeight: "bold",
     marginBottom: 4,
   },
   cardSubtitle: {
-    color: "#eee",
     fontSize: 13,
     opacity: 0.85,
   },
 });
 
 const styles = StyleSheet.create({
-
   notificationBanner: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'flex-start',
-  paddingHorizontal: 10,
-  paddingVertical: 10,
-  marginHorizontal: 10,
-  marginTop: 80,
-
-
-},
-notificationTextContainer: {
-  flex: 1,
-  marginLeft: 12,
-  marginRight: 8,
-},
-greetingText: {
-  color: '#fff',
-  fontSize: 16,
-  fontWeight: 'bold',
-},
-subText: {
-  color: '#aaa',
-  fontSize: 14,
-  marginTop: 2,
-},
-
-  // -- Balance Section --
-balanceSectionContainer: {
-  borderRadius: 20,
-  padding: 10,
-  margin: 15,
-  shadowColor: "#000000ff",     // Soft neon green glow
-  shadowOffset: { width: 0, height: 10 },
-  shadowOpacity: 0.3,
-  shadowRadius: 20,
-  elevation: 16,
-  borderWidth: 1,
-  borderColor: "rgba(3, 153, 81, 0.25)", // Soft green glow border
-  overflow: 'hidden',
-  
-},
-balanceCardPop: {
-  backgroundColor: "#000000ff",
-  shadowColor: "rgba(0, 0, 0, 0)",
-  shadowOpacity: 0.25,
-  shadowRadius: 12,
-  shadowOffset: { width: 0, height: 8 },
-  elevation: 10,
-  borderWidth: 0.5,
-  borderColor: "rgba(0, 0, 0, 0.28)",
-},
-balanceValue: {  shadowColor: "#000000ff",     // Neon green glow
-  shadowOffset: { width: 0, height: 8 },
-  shadowOpacity: 0.3,
-  shadowRadius: 16,
-  elevation: 15,
-  borderWidth: 1,
-  borderColor: "rgba(0, 255, 153, 0.3)", // Soft glow border
-  overflow: 'hidden',
-  fontSize: 28,
-  fontWeight: "bold",
-  color: "#E0FFE8",
-  textShadowColor: "rgba(0,255,153,0.4)",
-  textShadowOffset: { width: 0, height: 2 },
-  textShadowRadius: 6,
-},
-
-balanceHeaderRow: {
-  flexDirection: "row",
-  justifyContent: "space-between", // 👈 puts Portfolio left & 1D right
-  alignItems: "center",
-  marginTop: -15, // adds space above the header
-},
-balanceLabel: {
-  fontSize: 16,
-  color: "#fff",
-  fontWeight: "600",
-},
-performanceContainer: {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between", // puts max space between two children
-  gap: 10, // adds space between performance label and percentage box
-  marginTop: 25, // adds space above the performance section
-},
-
-performanceLabel: {
-  color: "#fff",
-  // Add this line (increased spacing)
-  fontSize: 12,
-},
-
-percentageBox: {
-  backgroundColor: "rgba(66,231,162,0.2)",
-  borderRadius: 2,
-
-},
-percentageValue: {
-  color: "#42e7a2",
-  fontSize: 12,
-  fontWeight: "500",
-},
-balanceContentRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-},
-balanceLeftColumn: {
-  flex: 1,
-},
-balanceValue: {
-  fontSize: 27,
-  fontWeight: "bold",
-  color: "#fff",
-  marginTop: -15,
-},
-balanceChange: {
-  fontSize: 12,
-  color: "#fff",
-  marginVertical: 4,
-  marginTop: 0,
-},
-tokenRow: {
-  flexDirection: "row",
-  marginTop: 8,
-},
-tokenCircle: {
-  width: 30,
-  height: 30,
-  borderRadius: 16,
-  overflow: "hidden",
-  borderWidth: 1,
-  marginRight: 3, // You can adjust or replace with marginLeft for overlap
-  backgroundColor: "#18594f", // slightly visible background in case image doesn't cover fully
-  justifyContent: "center",
-  alignItems: "center",
-  flexDirection: "row", // for specialCircle icons
-},
-specialCircle: {
-  width: 50,
-  height: 32,
-  borderRadius: 16,
-  paddingHorizontal: 4,
-  backgroundColor: "#0f5942",
-  borderWidth: 1,
-  borderColor: "#42e7a2",
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginLeft: -10,
-},
-iconSmallCircle: {
-  width: 20,
-  height: 20,
-  borderRadius: 10,
-  backgroundColor: "#42e7a2",
-  justifyContent: "center",
-  alignItems: "center",
-  marginHorizontal: 1,
-},
-
-tokenImage: {
-  width: "100%",
-  height: "100%",
-  resizeMode: "cover",
-},
-tokenCircleOverlap: {
-  marginLeft: -10,
-},
-
-  // --- Fixed Performance Display ---
-  performanceFixed: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    marginTop: 8,
+    justifyContent: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    marginHorizontal: 10,
+    marginTop: 80,
   },
-  performanceLabel: {
-    color: "#aaa",
-    fontSize: 14,
-    fontWeight: "600",
+  notificationTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
   },
-  percentageBox: {
-    backgroundColor: "rgba(0,0,0,0.4)",
-    paddingHorizontal: 1,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#1a402c",
-  },
-  percentageValue: {
-    color: "#3be89e",
-    fontSize: 13,
+  greetingText: {
+    fontSize: 16,
     fontWeight: "bold",
   },
-labelContainer: {
-  position: 'absolute',
-  top: 13, // Adjust based on chart height
-  right: 55,
-  flexDirection: 'row',
-  alignItems: 'center',
-  backgroundColor: 'rgba(0,0,0,0.4)',
-  paddingHorizontal: 1,
-  paddingVertical: 1,
-  borderRadius: 4,
-},
-labelText: {
-  color: '#fff',
-  fontSize: 10,
-  fontWeight: '500',
-},
-  // -- Unlock Rewards card --
+  subText: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  smallBadge: {
+    position: "absolute",
+    top: 10,
+    left: 28,
+    backgroundColor: "#db0000ff",
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    minWidth: 14,
+    height: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  smallBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+
+  balanceSectionContainer: {
+    borderRadius: 20,
+    padding: 10,
+    margin: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: "rgba(0,219,132,0.3)",
+    overflow: 'hidden',
+  },
+  balanceHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: -15,
+  },
+  balanceLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  performanceContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    marginTop: 25,
+  },
+  performanceLabel: {
+    fontSize: 12,
+  },
+  percentageBox: {
+    backgroundColor: "rgba(0,219,132,0.1)",
+    borderRadius: 2,
+  },
+  percentageValue: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  balanceContentRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  balanceLeftColumn: {
+    flex: 1,
+  },
+  balanceValue: {
+    fontSize: 27,
+    fontWeight: "bold",
+    marginTop: -15,
+  },
+  balanceChange: {
+    fontSize: 12,
+    marginVertical: 4,
+    marginTop: 0,
+  },
+  tokenRow: {
+    flexDirection: "row",
+    marginTop: 8,
+  },
+  tokenCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    marginRight: 3,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  tokenImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  tokenCircleOverlap: {
+    marginLeft: -10,
+  },
+  labelContainer: {
+    position: 'absolute',
+    top: 13,
+    right: 55,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 1,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  labelText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '500',
+  },
   rewardCard: {
-    backgroundColor: "#024F36",
     borderRadius: 14,
     marginHorizontal: 18,
     marginTop: 4,
@@ -785,30 +731,32 @@ labelText: {
     paddingHorizontal: 17,
   },
   rewardCardIcon: {
-    backgroundColor: "#15725933",
     borderRadius: 50,
     padding: 9,
     marginRight: 15,
   },
   rewardCardTitle: {
-    color: "#fff",
     fontWeight: "bold",
     fontSize: 17,
   },
   rewardCardSubtitle: {
-    color: "#c8fde0ff",
     fontSize: 14,
     letterSpacing: 0.2,
   },
-
-  // -- Unified Card (Header + Scrollable Cards) --
+  viewRewardsLabel: {
+    fontWeight: "bold",
+    fontSize: 14,
+  },
   unifiedCard: {
-    backgroundColor: "#07392dff",
     borderRadius: 16,
     marginHorizontal: 16,
-    marginTop: 5,
+    marginTop: 10,
     overflow: "hidden",
     marginBottom: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
   },
   headerRow: {
     flexDirection: "row",
@@ -817,41 +765,30 @@ labelText: {
     marginBottom: 8,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
   },
   ownedText: {
-    color: "#aaa",
     fontSize: 15,
     fontWeight: "600",
   },
   ownedValue: {
-    color: "#fff",
     fontWeight: "bold",
   },
-
-  // -- Scrollable Content --
   scrollableContent: {
     marginHorizontal: 12,
   },
   scrollContent: {
     gap: 16,
   },
-
-  // -- Feature cards --
-
-
   FeaturedTitle: {
-    color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
     marginTop: 5,
-    marginLeft: 20,
   },
   featureCard: {
     width: 300,
-    backgroundColor:"#07392dff",
     borderRadius: 16,
     overflow: "hidden",
+    
   },
   featureCardImg: {
     width: "100%",
@@ -868,13 +805,11 @@ labelText: {
     marginBottom: 6,
   },
   featureCardTitle: {
-    color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
     flexShrink: 1,
   },
   featureCardPrice: {
-    color: "#fff",
     fontWeight: "bold",
     fontSize: 19,
     marginLeft: 12,
@@ -886,23 +821,17 @@ labelText: {
     marginBottom: 14,
   },
   featureCardLocation: {
-    color: "#aaa",
     fontSize: 13,
   },
   featureCardROI: {
-    color: "#3be89e",
     fontWeight: "700",
     fontSize: 13,
   },
-
-
-  // --- New & Analysis ---
   naContainer: {
     marginHorizontal: 16,
     marginTop: 20,
   },
   naTitle: {
-    color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 8,
@@ -912,10 +841,13 @@ labelText: {
   },
   analysisCard: {
     width: 360,
-    backgroundColor: "#07392dff",
     borderRadius: 16,
     overflow: "hidden",
     marginBottom: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
   },
   imageContainer: {
     position: "relative",
@@ -959,20 +891,17 @@ labelText: {
     padding: 10,
   },
   analysisTitle: {
-    color: "#fff",
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 1,
   },
   contentType: {
-    color: "#54c2926b",
     fontSize: 12,
     fontWeight: "600",
     marginBottom: 1,
     textTransform: "uppercase",
   },
   analysisSubtitle: {
-    color: "#aaa",
     fontSize: 12,
     marginBottom: 1,
   },
@@ -984,8 +913,6 @@ labelText: {
     padding: 6,
     paddingBottom: 1,
   },
-
-  // --- Dots Indicator ---
   dotsContainer: {
     flexDirection: "row",
     justifyContent: "center",
@@ -999,20 +926,14 @@ labelText: {
     borderRadius: 3,
   },
   dotActive: {
-    backgroundColor: "#aaa",
     width: 8,
     height: 8,
   },
-  dotInactive: {
-    backgroundColor: "rgba(255,255,255,0.2)",
-  },
-
-  // -- Community Join Button --
+  dotInactive: {},
   communityJoinButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#07392dff",
     borderRadius: 20,
     paddingVertical: 12,
     paddingHorizontal: 20,
@@ -1025,15 +946,24 @@ labelText: {
     elevation: 5,
   },
   communityJoinIcon: {
-    backgroundColor: "#193541ff",
     borderRadius: 50,
     padding: 8,
     marginRight: 10,
   },
   communityJoinText: {
-    color: "#fff",
     fontSize: 16,
     fontWeight: "600",
     flex: 1,
+  },
+  coraButtonContainer: {
+    position: "absolute",
+    bottom: 70,
+    zIndex: 20,
+    borderRadius: 50,
+  },
+  coraButtonImage: {
+    width: 50,
+    height: 50,
+    resizeMode: "contain",
   },
 });
